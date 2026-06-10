@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { loadMeta, loadPool, loadStrengths } from "@/lib/game/data";
+import { BASE_PATH, loadMeta, loadPool, loadStrengths } from "@/lib/game/data";
 import { mulberry32, randomSeed } from "@/lib/game/rng";
 import { simulateSeason, SimResult } from "@/lib/game/sim";
 import {
@@ -178,7 +178,7 @@ function PlayInner() {
         .map((p, i) => (p ? { d: p.decade, c: p.club, id: p.player.id, i } : null))
         .filter(Boolean),
     });
-    setShareUrl(`${window.location.origin}/play?mode=${m}&d=${payload}`);
+    setShareUrl(`${window.location.origin}${BASE_PATH}/play/?mode=${m}&d=${payload}`);
     setPhase("result");
   }
 
