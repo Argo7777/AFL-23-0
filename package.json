@@ -1,0 +1,16 @@
+{
+  "name": "afl-23-0",
+  "private": true,
+  "workspaces": [
+    "pipeline",
+    "web"
+  ],
+  "scripts": {
+    "scrape": "npm run scrape -w pipeline",
+    "positions": "npm run positions -w pipeline",
+    "export": "npm run export -w pipeline",
+    "refresh": "npm run refresh -w pipeline",
+    "dev": "npm run dev -w web",
+    "build": "npm run build -w web"
+  }
+}

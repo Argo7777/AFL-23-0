@@ -1,0 +1,6 @@
+node_modules/
+pipeline/cache/
+pipeline/data.sqlite*
+web/.next/
+web/out/
+.DS_Store

@@ -1,0 +1,21 @@
+{
+  "name": "pipeline",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scrape": "tsx src/cli.ts scrape:afltables && tsx src/cli.ts scrape:awards && tsx src/cli.ts scrape:wikidata",
+    "positions": "tsx src/cli.ts scrape:positions",
+    "export": "tsx src/cli.ts export",
+    "refresh": "tsx src/cli.ts refresh"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
