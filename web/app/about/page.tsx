@@ -1,6 +1,11 @@
 import Link from "next/link";
 
-export const metadata = { title: "About the numbers — AFL 23-0" };
+export const metadata = {
+  title: "About the numbers",
+  description:
+    "How AFL 23-0 rates 130 years of footballers from real scraped data: era-relative stats, Brownlow votes, All-Australian selections, premierships, derived salaries and a season simulation calibrated to real team performance.",
+  alternates: { canonical: "/about" },
+};
 
 const sections: { h: string; body: string[] }[] = [
   {
