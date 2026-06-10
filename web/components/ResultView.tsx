@@ -40,14 +40,16 @@ export default function ResultView({
       <div className="text-center">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">your season</p>
         <div
-          className={`font-display mt-2 text-8xl font-black ${
+          className={`font-display mt-2 text-6xl font-black sm:text-8xl ${
             perfect ? "text-grass" : sim.wins >= 18 ? "text-gold" : "text-slate-200"
           }`}
         >
           {sim.wins}–{sim.losses}
         </div>
         {sim.finals.modal === "premiers" && (
-          <div className="font-display mt-1 text-3xl font-black text-gold">🏆 PREMIERS</div>
+          <div className="font-display mt-1 text-2xl font-black text-gold sm:text-3xl">
+            🏆 PREMIERS
+          </div>
         )}
         <p className="mt-2 text-slate-300">
           {perfect && sim.finals.modal === "premiers"
@@ -113,7 +115,7 @@ export default function ResultView({
             <div className="grid gap-1.5">
               {(["premiers", "runnerUp", "prelim", "semi", "elim", "missed"] as FinalsOutcome[]).map((o) => (
                 <div key={o} className="flex items-center gap-2 text-xs">
-                  <span className={`w-36 shrink-0 ${o === "premiers" ? "font-bold text-gold" : "text-slate-400"}`}>
+                  <span className={`w-28 shrink-0 sm:w-36 ${o === "premiers" ? "font-bold text-gold" : "text-slate-400"}`}>
                     {FINALS_LABELS[o]}
                   </span>
                   <div className="h-2.5 flex-1 overflow-hidden rounded bg-pitch">

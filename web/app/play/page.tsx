@@ -64,6 +64,7 @@ function PlayInner() {
   const [teamRating, setTeamRating] = useState(0);
   const [shareUrl, setShareUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showField, setShowField] = useState(false); // mobile: field behind a toggle
 
   const picks = useMemo(() => roster.filter((p): p is Pick => p !== null), [roster]);
   const pickCount = picks.length;
@@ -140,10 +141,11 @@ function PlayInner() {
           }
         }
         const eraParam = params.get("eras");
+        const modern = m.decades.filter((d) => d >= 1980);
         const chosen = eraParam
           ? eraParam.split(",").map(Number).filter((d) => m.decades.includes(d))
-          : m.decades;
-        setEras(chosen.length ? chosen : m.decades);
+          : modern;
+        setEras(chosen.length ? chosen : modern);
       } catch {
         setError("Couldn't load game data. Run the data pipeline first.");
       }
@@ -343,9 +345,19 @@ function PlayInner() {
         </div>
       </div>
 
+      {/* mobile: keep the pick list front and centre, field one tap away */}
+      <button
+        onClick={() => setShowField((s) => !s)}
+        className="mt-3 w-full rounded-xl border border-line bg-pitch-light py-2 font-display text-sm font-black text-grass lg:hidden"
+      >
+        {showField ? "HIDE TEAM ▲" : `VIEW TEAM ON THE OVAL (${pickCount}/${totalPicks}) ▼`}
+      </button>
+
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(280px,380px)_1fr]">
         {/* field column */}
-        <div className="lg:sticky lg:top-4 lg:self-start">
+        <div
+          className={`${showField || phase === "review" ? "" : "hidden"} lg:block lg:sticky lg:top-4 lg:self-start`}
+        >
           <TeamField
             mode={mode}
             roster={roster}

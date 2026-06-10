@@ -12,6 +12,15 @@ export function minGamesForDecade(decade: number): number {
 }
 
 /**
+ * Full statistical trust needs a real body of work within the decade — a hot
+ * two-season stint shouldn't outrank a decade-long career. Below this, the
+ * stat percentile shrinks toward the median.
+ */
+export function reliabilityGamesForDecade(decade: number): number {
+  return decade < 1920 ? 20 : 45;
+}
+
+/**
  * Per-position stat weights, applied to era z-scores of per-game rates.
  * Stats missing in an era contribute nothing and the remaining weights are
  * renormalized — nothing is imputed.

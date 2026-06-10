@@ -5,7 +5,8 @@ import {
   BLEND_HI, BLEND_LO, COVERAGE_TRUST_EXP,
   AA_LINE_BONUS, AA_INT_BONUS, AA_SQUAD_BONUS, AA_POS_BONUS_CAP,
   OFF_POS_ACC_FACTOR, OFF_POS_RATING_FACTOR,
-  VERSATILITY_THRESHOLD, VERSATILITY_BONUS, VERSATILITY_MAX_MULT, minGamesForDecade,
+  VERSATILITY_THRESHOLD, VERSATILITY_BONUS, VERSATILITY_MAX_MULT,
+  minGamesForDecade, reliabilityGamesForDecade,
   RUCK_FLOOR, ruckHitoutMult, ruckHeightMult, keyPositionHeightBonus,
 } from "./config.js";
 import { buildPositionEvidence } from "./positions.js";
@@ -423,9 +424,9 @@ export function computeRatings(): PlayerDecade[] {
     for (const p of pool) {
       const scores = rawScore.get(p)!;
       // small samples carry little information: shrink a player's stat
-      // percentile toward the median by how far short of the games
-      // qualification he falls (7 hot games shouldn't outrate 150 good ones)
-      const reliability = Math.min(1, p.games / minGames) ** 0.7;
+      // percentile toward the median by how far short of a real body of
+      // decade work he falls (36 hot games shouldn't outrank 189 great ones)
+      const reliability = Math.min(1, p.games / reliabilityGamesForDecade(decade)) ** 0.7;
       const hoZ = z(p, "ho");
 
       // AA line selections certify the position they were earned in

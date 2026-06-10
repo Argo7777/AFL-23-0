@@ -34,7 +34,8 @@ export default function Home() {
   useEffect(() => {
     loadMeta().then((m) => {
       setMeta(m);
-      setEras(new Set(m.decades));
+      // default to the modern game; the full 130 years is one tap away
+      setEras(new Set(m.decades.filter((d) => d >= 1980)));
     });
   }, []);
 
@@ -51,7 +52,7 @@ export default function Home() {
   };
 
   const allEras = meta ? eras.size === meta.decades.length : true;
-  const eraParam = meta && !allEras ? `&eras=${[...eras].sort().join(",")}` : "";
+  const eraParam = meta ? `&eras=${[...eras].sort((a, b) => a - b).join(",")}` : "";
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">

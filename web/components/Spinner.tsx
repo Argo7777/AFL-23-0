@@ -42,15 +42,17 @@ export default function Spinner({
   return (
     <div className="flex flex-col items-center py-10">
       <div
-        className={`rounded-3xl border-2 px-10 py-8 text-center transition-all ${
+        className={`w-full max-w-md rounded-3xl border-2 px-4 py-6 text-center transition-all sm:px-10 sm:py-8 ${
           settled
             ? "border-grass bg-card shadow-[0_0_50px_-10px] shadow-grass/50 pop"
             : "border-line bg-pitch-light"
         }`}
       >
         <div key={display.club + display.decade} className={settled ? "" : "spinflash"}>
-          <div className="font-display text-5xl font-black">{display.club}</div>
-          <div className="mt-2 font-display text-3xl font-black text-gold">{display.decade}s</div>
+          <div className="font-display text-3xl font-black sm:text-5xl">{display.club}</div>
+          <div className="mt-2 font-display text-2xl font-black text-gold sm:text-3xl">
+            {display.decade}s
+          </div>
         </div>
       </div>
       <p className="mt-4 text-xs uppercase tracking-[0.25em] text-slate-500">
