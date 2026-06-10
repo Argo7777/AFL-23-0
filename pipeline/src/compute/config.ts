@@ -23,8 +23,36 @@ export const POS_WEIGHTS: Record<Position, Record<string, number>> = {
   RUC: { ho: 3.5, cm: 1.0, cl: 1.0, tk: 0.5, mk: 0.5, gl: 0.25, ff: 0.25 },
 };
 
-/** Stat-side vs accolade-side blend (stat side scales down with era coverage). */
-export const STAT_BLEND = 0.72;
+/**
+ * Stats and accolades are complementary evidence: counting stats miss
+ * lockdown defenders, medals miss underdecorated stat machines. The final
+ * rating leans toward whichever signal is STRONGER for the player, so an
+ * era's best goalkicker isn't dragged down by modest honours and an
+ * all-time full-back isn't buried by invisible-in-the-stats defending.
+ */
+export const BLEND_HI = 0.62; // weight on the stronger of (stat pct, accolades)
+export const BLEND_LO = 0.38; // weight on the weaker
+/** stat percentile trust decays gently with era coverage: cov^this */
+export const COVERAGE_TRUST_EXP = 0.25;
+
+/**
+ * All-Australian line selections are direct, positional proof of elite play
+ * (FB/HB lines certify defence, C the midfield, HF/FF the attack, FOL the
+ * followers). Added straight onto that position's rating.
+ */
+export const AA_LINE_BONUS = 6; // per selection in a named line
+export const AA_INT_BONUS = 4; // interchange selection -> natural position
+export const AA_SQUAD_BONUS = 2; // extended squad -> natural position
+export const AA_POS_BONUS_CAP = 25;
+
+/**
+ * Off-position discounts: accolades were earned somewhere specific, and in
+ * eras without defensive stats a champion forward's marks/kicks would
+ * otherwise score like a champion defender's. Playing a player outside his
+ * recorded positions costs him.
+ */
+export const OFF_POS_ACC_FACTOR = 0.6; // accolade signal off-position
+export const OFF_POS_RATING_FACTOR = 0.85; // final rating off-position
 
 /**
  * Accolade points (each input scraped): converted to a 0-100 score by capping.

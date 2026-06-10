@@ -1,7 +1,10 @@
 import { db } from "../lib/db.js";
 import { canonicalClub, normalizeName, foldFirstName, FOOTYWIRE_CLUBS } from "../lib/clubs.js";
 import {
-  POSITIONS, Position, POS_WEIGHTS, STAT_BLEND, ACCOLADE_POINTS, ACCOLADE_CAP,
+  POSITIONS, Position, POS_WEIGHTS, ACCOLADE_POINTS, ACCOLADE_CAP,
+  BLEND_HI, BLEND_LO, COVERAGE_TRUST_EXP,
+  AA_LINE_BONUS, AA_INT_BONUS, AA_SQUAD_BONUS, AA_POS_BONUS_CAP,
+  OFF_POS_ACC_FACTOR, OFF_POS_RATING_FACTOR,
   VERSATILITY_THRESHOLD, VERSATILITY_BONUS, VERSATILITY_MAX_MULT, minGamesForDecade,
   RUCK_FLOOR, ruckHitoutMult, ruckHeightMult, keyPositionHeightBonus,
 } from "./config.js";
@@ -29,6 +32,7 @@ export interface PlayerDecade {
   brTop10: number;
   aaTeam: number;
   aaSquad: number;
+  aaLines: Record<string, number>; // AA selections by line: FB/HB/C/FOL/HF/FF/INT/SQUAD
   colemanTop1: number;
   colemanTop3: number;
   premierships: number;
@@ -102,7 +106,7 @@ export function computeRatings(): PlayerDecade[] {
       pd = {
         key: r.player_key, name: displayName(r.player_name), decade, height: null,
         games: 0, clubs: new Map(), years: [r.year, r.year], totals: {}, rates: {},
-        br: 0, brWins: 0, brTop10: 0, aaTeam: 0, aaSquad: 0, colemanTop1: 0,
+        br: 0, brWins: 0, brTop10: 0, aaTeam: 0, aaSquad: 0, aaLines: {}, colemanTop1: 0,
         colemanTop3: 0, premierships: 0, risingStarWin: 0, accScore: 0,
         posRating: { DEF: 0, MID: 0, RUC: 0, FWD: 0 }, natural: "MID",
         eligible: [], posSource: "stats", utlMult: 1, best: 0,
@@ -254,6 +258,8 @@ export function computeRatings(): PlayerDecade[] {
     if (!pd) { aaUnmatched++; continue; }
     if (row.pos === "SQUAD") pd.aaSquad++;
     else pd.aaTeam++;
+    const line = row.pos ?? "INT";
+    pd.aaLines[line] = (pd.aaLines[line] ?? 0) + 1;
   }
 
   // Rising Star winners
@@ -417,18 +423,40 @@ export function computeRatings(): PlayerDecade[] {
       // percentile toward the median by how far short of the games
       // qualification he falls (7 hot games shouldn't outrate 150 good ones)
       const reliability = Math.min(1, p.games / minGames) ** 0.7;
+      const hoZ = z(p, "ho");
+
+      // AA line selections certify the position they were earned in
+      const aaBonus: Record<Position, number> = { DEF: 0, MID: 0, RUC: 0, FWD: 0 };
+      const lines = p.aaLines;
+      aaBonus.DEF += ((lines.FB ?? 0) + (lines.HB ?? 0)) * AA_LINE_BONUS;
+      aaBonus.MID += (lines.C ?? 0) * AA_LINE_BONUS;
+      aaBonus.FWD += ((lines.HF ?? 0) + (lines.FF ?? 0)) * AA_LINE_BONUS;
+      // followers line = ruck + rovers: credit RUC only with big-man evidence
+      const folPos: Position =
+        (hoZ != null && hoZ >= 0.75) || (p.height != null && p.height >= 195) ? "RUC" : "MID";
+      aaBonus[folPos] += (lines.FOL ?? 0) * AA_LINE_BONUS;
+      aaBonus[p.natural] += (lines.INT ?? 0) * AA_INT_BONUS + (lines.SQUAD ?? 0) * AA_SQUAD_BONUS;
+
       for (const pos of POSITIONS) {
+        const offPos = !p.eligible.includes(pos);
         const statPct0 = percentileOf(cohortSorted[pos], scores[pos]);
-        const statPct = 0.5 + (statPct0 - 0.5) * reliability;
-        // stat weight scales with how much real stat coverage this era has
-        const wStat = STAT_BLEND * coverage[pos];
-        const rating = 100 * wStat * statPct + (1 - wStat) * p.accScore;
+        // trust in the stat percentile decays gently with era stat coverage
+        const trust = Math.pow(coverage[pos], COVERAGE_TRUST_EXP) * reliability;
+        const statEff = 0.5 + (statPct0 - 0.5) * trust;
+        // honours were earned at the player's real positions
+        const accNorm = (p.accScore / 100) * (offPos ? OFF_POS_ACC_FACTOR : 1);
+        // lean toward the stronger signal: stats see what medals miss and
+        // medals see what stats miss (lockdown defenders, era goalkickers)
+        const hi = Math.max(statEff, accNorm);
+        const lo = Math.min(statEff, accNorm);
+        const rating =
+          (100 * (BLEND_HI * hi + BLEND_LO * lo) + Math.min(AA_POS_BONUS_CAP, aaBonus[pos])) *
+          (offPos ? OFF_POS_RATING_FACTOR : 1);
         p.posRating[pos] = Math.round(Math.max(0, Math.min(100, rating)) * 10) / 10;
       }
 
       // RUC gated by real big-man evidence: hitouts won, listed height, or a
       // recorded ruck position — stops 180cm ball-winners topping ruck pools
-      const hoZ = z(p, "ho");
       const ruckMult = Math.max(
         hoZ != null ? ruckHitoutMult(hoZ) : 0,
         p.height != null ? ruckHeightMult(p.height) : 0,
