@@ -18,6 +18,14 @@ html {
   color: #e2e8f0;
 }
 
+/* every size in the UI is rem-based, so scaling the root "zooms out"
+   the whole interface proportionally on phones */
+@media (max-width: 640px) {
+  html {
+    font-size: 13.5px;
+  }
+}
+
 body {
   min-height: 100dvh;
   background:
