@@ -35,6 +35,7 @@ const sections: { h: string; body: string[] }[] = [
     h: "The season simulation",
     body: [
       "Every real club season since 1897 gets a strength score from its actual results (win percentage blended with points share). Your team rating maps onto that real distribution for the eras you selected — a 2020s-only side is measured against real 2020s teams. Your season is then simulated 10,000 times, 23 games against opponents drawn from those real club-seasons, using head-to-head win probabilities. The record you see is the most common outcome; the 23-0 figure is how often your side ran the table. Only teams beyond anything history ever produced go undefeated more often than not.",
+      "A strong enough home-and-away record earns a finals berth in each simulated season — top of the ladder gets the double chance, lower seeds must win four straight — and every September game is played against opponents drawn from the era's best teams. The campaign summary shows how often your side lifts the cup, loses the Grand Final, or bows out earlier.",
     ],
   },
 ];

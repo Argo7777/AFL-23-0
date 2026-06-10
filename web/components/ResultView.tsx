@@ -3,8 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Mode, Pick } from "@/lib/game/types";
-import { SimResult } from "@/lib/game/sim";
+import { FinalsOutcome, SimResult } from "@/lib/game/sim";
 import TeamField from "@/components/TeamField";
+
+const FINALS_LABELS: Record<FinalsOutcome, string> = {
+  premiers: "Premiers",
+  runnerUp: "Grand Final loss",
+  prelim: "Preliminary final exit",
+  semi: "Semi final exit",
+  elim: "Out in week one",
+  missed: "Missed September",
+};
 
 export default function ResultView({
   mode,
@@ -37,16 +46,21 @@ export default function ResultView({
         >
           {sim.wins}–{sim.losses}
         </div>
+        {sim.finals.modal === "premiers" && (
+          <div className="font-display mt-1 text-3xl font-black text-gold">🏆 PREMIERS</div>
+        )}
         <p className="mt-2 text-slate-300">
-          {perfect
-            ? "PERFECTION. An undefeated season across the eras."
-            : sim.wins >= 20
-              ? "An all-time great side — agonisingly short of immortality."
-              : sim.wins >= 15
-                ? "A genuine contender, but the perfect season stays a dream."
-                : sim.wins >= 10
-                  ? "Finals footy, maybe. Perfection, no."
-                  : "Back to the drawing board, coach."}
+          {perfect && sim.finals.modal === "premiers"
+            ? "PERFECTION. Undefeated, and the flag to prove it."
+            : sim.finals.modal === "premiers"
+              ? "A September juggernaut — this side salutes more often than not."
+              : sim.wins >= 20
+                ? "An all-time great season — September is theirs to lose."
+                : sim.finals.modal !== "missed"
+                  ? `Finals footy: most seasons end in a ${FINALS_LABELS[sim.finals.modal].toLowerCase()}.`
+                  : sim.wins >= 10
+                    ? "Mid-table. September watches on from the couch."
+                    : "Back to the drawing board, coach."}
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-slate-400">
           <span>
@@ -58,6 +72,9 @@ export default function ResultView({
           </span>
           <span>
             Goes 23-0 in <b className="text-slate-100">{sim.perfectPct.toFixed(1)}%</b> of seasons
+          </span>
+          <span>
+            Wins the flag in <b className="text-gold">{sim.finals.premiersPct.toFixed(1)}%</b>
           </span>
         </div>
       </div>
@@ -86,6 +103,30 @@ export default function ResultView({
             <div className="mt-1 flex justify-between text-[10px] text-slate-600">
               <span>0 wins</span>
               <span>23 wins</span>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-line bg-pitch-light p-4">
+            <p className="mb-2 text-[11px] uppercase tracking-widest text-slate-500">
+              September — how the campaign ends ({sim.finals.madeFinalsPct.toFixed(0)}% of seasons make finals)
+            </p>
+            <div className="grid gap-1.5">
+              {(["premiers", "runnerUp", "prelim", "semi", "elim", "missed"] as FinalsOutcome[]).map((o) => (
+                <div key={o} className="flex items-center gap-2 text-xs">
+                  <span className={`w-36 shrink-0 ${o === "premiers" ? "font-bold text-gold" : "text-slate-400"}`}>
+                    {FINALS_LABELS[o]}
+                  </span>
+                  <div className="h-2.5 flex-1 overflow-hidden rounded bg-pitch">
+                    <div
+                      className={`h-full rounded ${o === "premiers" ? "bg-gold" : o === "missed" ? "bg-line" : "bg-ice/60"}`}
+                      style={{ width: `${Math.min(100, sim.finals.pct[o])}%` }}
+                    />
+                  </div>
+                  <span className="w-12 shrink-0 text-right text-slate-300">
+                    {sim.finals.pct[o].toFixed(1)}%
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
