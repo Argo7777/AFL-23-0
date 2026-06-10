@@ -1,6 +1,6 @@
 # AFL 23-0 — All-Era Team Builder
 
-**▶ Play it: [danieltomaro13.github.io/AFL-23-0](https://danieltomaro13.github.io/AFL-23-0/)**
+**▶ Play it: [afl23-0.com](https://afl23-0.com/)**
 
 Inspired by [23-0.com](https://23-0.com), rebuilt for Aussie rules. Spin a random
 **club + decade** from 130 years of VFL/AFL history, pick a player from that pool,
