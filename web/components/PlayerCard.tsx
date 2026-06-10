@@ -54,6 +54,7 @@ export default function PlayerCard({
           <div className="truncate font-display text-lg font-black">{p.n}</div>
           <div className="mt-0.5 text-[11px] text-slate-400">
             {p.g} games · {p.y[0]}–{p.y[1]} · {club}
+            {p.h ? ` · ${p.h}cm` : ""}
           </div>
         </div>
         <div className="shrink-0 text-right">

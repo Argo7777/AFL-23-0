@@ -54,6 +54,7 @@ export function exportData() {
         id: `${p.key}|${p.decade}`,
         n: p.name,
         g: p.games,
+        h: p.height,
         y: p.years,
         c: Object.fromEntries(p.clubs),
         r: p.posRating,

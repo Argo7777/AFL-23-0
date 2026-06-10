@@ -44,6 +44,26 @@ export const ACCOLADE_POINTS = {
 };
 export const ACCOLADE_CAP = 100;
 
+/**
+ * Ruck plausibility: a high clearance/tackle profile must not make a 180cm
+ * midfielder an elite ruck pick. The RUC rating is gated by the best of three
+ * real signals — hitouts actually won, listed height, or a recorded ruck
+ * position — with a hard floor (anyone can stand in the square, badly).
+ */
+export const RUCK_FLOOR = 0.45;
+export function ruckHitoutMult(hoZ: number): number {
+  return hoZ >= 1.5 ? 1.0 : hoZ >= 0.75 ? 0.85 : hoZ >= 0.25 ? 0.7 : 0;
+}
+export function ruckHeightMult(heightCm: number): number {
+  return heightCm >= 202 ? 1.0 : heightCm >= 198 ? 0.85 : heightCm >= 194 ? 0.65 : heightCm >= 190 ? 0.5 : 0;
+}
+
+/** Key-position size: genuine talls get a bump at FWD and DEF. */
+export function keyPositionHeightBonus(heightCm: number | null): number {
+  if (heightCm == null) return 1;
+  return heightCm >= 196 ? 1.06 : heightCm >= 192 ? 1.04 : heightCm >= 188 ? 1.02 : 1;
+}
+
 /** UTL versatility: bonus per extra position the player rates >= threshold in. */
 export const VERSATILITY_THRESHOLD = 62; // rating out of 100
 export const VERSATILITY_BONUS = 0.04;

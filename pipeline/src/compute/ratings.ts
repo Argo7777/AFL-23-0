@@ -3,6 +3,7 @@ import { canonicalClub, normalizeName, foldFirstName, FOOTYWIRE_CLUBS } from "..
 import {
   POSITIONS, Position, POS_WEIGHTS, STAT_BLEND, ACCOLADE_POINTS, ACCOLADE_CAP,
   VERSATILITY_THRESHOLD, VERSATILITY_BONUS, VERSATILITY_MAX_MULT, minGamesForDecade,
+  RUCK_FLOOR, ruckHitoutMult, ruckHeightMult, keyPositionHeightBonus,
 } from "./config.js";
 import { buildPositionEvidence } from "./positions.js";
 
@@ -17,6 +18,7 @@ export interface PlayerDecade {
   name: string; // display "First Last"
   decade: number;
   games: number;
+  height: number | null; // cm, from footywire profile where crawled
   clubs: Map<string, number>; // canonical club -> games for that club in decade
   years: [number, number];
   totals: Partial<Record<Stat, number>>;
@@ -98,7 +100,7 @@ export function computeRatings(): PlayerDecade[] {
     let pd = byPD.get(id);
     if (!pd) {
       pd = {
-        key: r.player_key, name: displayName(r.player_name), decade,
+        key: r.player_key, name: displayName(r.player_name), decade, height: null,
         games: 0, clubs: new Map(), years: [r.year, r.year], totals: {}, rates: {},
         br: 0, brWins: 0, brTop10: 0, aaTeam: 0, aaSquad: 0, colemanTop1: 0,
         colemanTop3: 0, premierships: 0, risingStarWin: 0, accScore: 0,
@@ -278,6 +280,21 @@ export function computeRatings(): PlayerDecade[] {
     console.warn(`  unmatched joins: AA ${aaUnmatched}, GF ${gfUnmatched}`);
   }
 
+  // heights from crawled footywire profiles, keyed by normalized name
+  const heightRows = db
+    .prepare(`SELECT slug, height_cm FROM fw_profiles WHERE height_cm IS NOT NULL AND height_cm > 0`)
+    .all() as { slug: string; height_cm: number }[];
+  const heightByName = new Map<string, number>();
+  for (const row of heightRows) {
+    const m = row.slug.match(/--(.+)$/);
+    if (!m) continue;
+    const name = normalizeName(m[1].replace(/-/g, " "));
+    heightByName.set(name, Math.max(heightByName.get(name) ?? 0, row.height_cm));
+  }
+  for (const pd of byPD.values()) {
+    pd.height = heightByName.get(normalizeName(pd.name)) ?? null;
+  }
+
   // ---- era-relative z-scores & cohorts per decade ----
   const decades = [...new Set([...byPD.values()].map((p) => p.decade))].sort();
   const evidence = buildPositionEvidence();
@@ -408,6 +425,23 @@ export function computeRatings(): PlayerDecade[] {
         const rating = 100 * wStat * statPct + (1 - wStat) * p.accScore;
         p.posRating[pos] = Math.round(Math.max(0, Math.min(100, rating)) * 10) / 10;
       }
+
+      // RUC gated by real big-man evidence: hitouts won, listed height, or a
+      // recorded ruck position — stops 180cm ball-winners topping ruck pools
+      const hoZ = z(p, "ho");
+      const ruckMult = Math.max(
+        hoZ != null ? ruckHitoutMult(hoZ) : 0,
+        p.height != null ? ruckHeightMult(p.height) : 0,
+        p.eligible.includes("RUC") ? 1 : 0,
+        RUCK_FLOOR,
+      );
+      p.posRating.RUC = Math.round(p.posRating.RUC * ruckMult * 10) / 10;
+
+      // genuine talls get key-position credit at either end
+      const kp = keyPositionHeightBonus(p.height);
+      p.posRating.FWD = Math.round(Math.min(100, p.posRating.FWD * kp) * 10) / 10;
+      p.posRating.DEF = Math.round(Math.min(100, p.posRating.DEF * kp) * 10) / 10;
+
       const strong = POSITIONS.filter((pos) => p.posRating[pos] >= VERSATILITY_THRESHOLD).length;
       const extra = Math.max(0, Math.max(strong, p.eligible.length) - 1);
       p.utlMult = Math.min(VERSATILITY_MAX_MULT, 1 + VERSATILITY_BONUS * extra);

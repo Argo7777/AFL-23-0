@@ -29,11 +29,11 @@ const LAYOUTS: Record<Mode, SlotInstance[]> = {
     { slot: "DEF", x: 70, y: 80, label: "BP" }, { slot: "DEF", x: 28, y: 69, label: "HB" },
     { slot: "DEF", x: 50, y: 71.5, label: "CHB" }, { slot: "DEF", x: 72, y: 69, label: "HB" },
     // centreline + followers
-    { slot: "MID", x: 13, y: 50, label: "W" }, { slot: "MID", x: 50, y: 43, label: "C" },
+    { slot: "MID", x: 13, y: 50, label: "W" }, { slot: "MID", x: 50, y: 41, label: "C" },
     { slot: "MID", x: 87, y: 50, label: "W" },
-    { slot: "MID", x: 40, y: 56, label: "FOL" }, { slot: "MID", x: 60, y: 56, label: "FOL" },
+    { slot: "MID", x: 35, y: 58, label: "FOL" }, { slot: "MID", x: 65, y: 58, label: "FOL" },
     // ruck at the bounce
-    { slot: "RUC", x: 50, y: 50, label: "RUC" },
+    { slot: "RUC", x: 50, y: 51, label: "RUC" },
     // forward six
     { slot: "FWD", x: 28, y: 30.5, label: "HF" }, { slot: "FWD", x: 50, y: 28, label: "CHF" },
     { slot: "FWD", x: 72, y: 30.5, label: "HF" }, { slot: "FWD", x: 30, y: 19, label: "FP" },

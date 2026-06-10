@@ -5,6 +5,7 @@ export interface PlayerEntry {
   id: string;
   n: string; // name
   g: number; // games in decade
+  h?: number | null; // height cm where known
   y: [number, number];
   c: Record<string, number>; // club -> games
   r: Record<Position, number>; // rating per position, 0-100
