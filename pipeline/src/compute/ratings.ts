@@ -409,6 +409,9 @@ export function computeRatings(): PlayerDecade[] {
       }
     }
 
+    // post-calibration adjustment factors per player (ruck gate, kp height)
+    const postFactors = new Map<PlayerDecade, { ruckMult: number; kp: number }>();
+
     // cohort percentiles: a player's score at position P is ranked against
     // the scores-at-P of players whose natural position is P
     const cohortSorted: Record<Position, number[]> = { DEF: [], MID: [], RUC: [], FWD: [] };
@@ -449,26 +452,66 @@ export function computeRatings(): PlayerDecade[] {
         // medals see what stats miss (lockdown defenders, era goalkickers)
         const hi = Math.max(statEff, accNorm);
         const lo = Math.min(statEff, accNorm);
+        // raw score is left unclamped here — cross-era calibration below maps
+        // every decade onto the same final 0-100 scale (the off-position
+        // discount is applied post-calibration with the other factors)
         const rating =
-          (100 * (BLEND_HI * hi + BLEND_LO * lo) + Math.min(AA_POS_BONUS_CAP, aaBonus[pos])) *
-          (offPos ? OFF_POS_RATING_FACTOR : 1);
-        p.posRating[pos] = Math.round(Math.max(0, Math.min(100, rating)) * 10) / 10;
+          100 * (BLEND_HI * hi + BLEND_LO * lo) + Math.min(AA_POS_BONUS_CAP, aaBonus[pos]);
+        p.posRating[pos] = Math.max(0, rating);
       }
 
-      // RUC gated by real big-man evidence: hitouts won, listed height, or a
-      // recorded ruck position — stops 180cm ball-winners topping ruck pools
+      // RUC gate (hitouts won, listed height, or a recorded ruck position)
+      // and key-position height credit are applied AFTER calibration, so
+      // rank normalization can't wash them back out — stash factors here
       const ruckMult = Math.max(
         hoZ != null ? ruckHitoutMult(hoZ) : 0,
         p.height != null ? ruckHeightMult(p.height) : 0,
         p.eligible.includes("RUC") ? 1 : 0,
         RUCK_FLOOR,
       );
-      p.posRating.RUC = Math.round(p.posRating.RUC * ruckMult * 10) / 10;
+      postFactors.set(p, { ruckMult, kp: keyPositionHeightBonus(p.height) });
+    }
 
-      // genuine talls get key-position credit at either end
-      const kp = keyPositionHeightBonus(p.height);
-      p.posRating.FWD = Math.round(Math.min(100, p.posRating.FWD * kp) * 10) / 10;
-      p.posRating.DEF = Math.round(Math.min(100, p.posRating.DEF * kp) * 10) / 10;
+    // ---- cross-era calibration ----
+    // Accolade types differ wildly by era (All-Australian only exists from
+    // 1991, Rising Star from 1993, advanced stats from the late 90s), which
+    // inflated modern decades. Rank within decade-and-position is the
+    // era-fair signal: every decade gets the same rating shape — its best
+    // player at a position ~100, 10th best ~88, median ~40.
+    for (const pos of POSITIONS) {
+      const sortedDesc = pool.map((p) => p.posRating[pos]).sort((a, b) => b - a);
+      const N = sortedDesc.length;
+      const calibrated = (raw: number): number => {
+        let lo = 0, hi = N;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (sortedDesc[mid] > raw) lo = mid + 1;
+          else hi = mid;
+        }
+        const rank = lo + 1; // 1 + count strictly better
+        // log-rank top tail (#1=100, #2=96.5, #8=89.5, #32=82.5, #64=79),
+        // then linear in percentile down through the body of the pool
+        if (rank <= 64) return 100 - 3.5 * Math.log2(rank);
+        const pct = 1 - (rank - 1) / N;
+        const pct64 = 1 - 63 / Math.max(64, N);
+        return Math.max(2, 79 * (pct / pct64));
+      };
+      for (const p of pool) {
+        p.posRating[pos] = Math.round(Math.min(100, calibrated(p.posRating[pos])) * 10) / 10;
+      }
+    }
+
+    for (const p of pool) {
+      const f = postFactors.get(p)!;
+      for (const pos of POSITIONS) {
+        if (!p.eligible.includes(pos)) {
+          p.posRating[pos] = p.posRating[pos] * OFF_POS_RATING_FACTOR;
+        }
+      }
+      p.posRating.RUC = Math.round(p.posRating.RUC * f.ruckMult * 10) / 10;
+      p.posRating.FWD = Math.round(Math.min(100, p.posRating.FWD * f.kp) * 10) / 10;
+      p.posRating.DEF = Math.round(Math.min(100, p.posRating.DEF * f.kp) * 10) / 10;
+      p.posRating.MID = Math.round(p.posRating.MID * 10) / 10;
 
       const strong = POSITIONS.filter((pos) => p.posRating[pos] >= VERSATILITY_THRESHOLD).length;
       const extra = Math.max(0, Math.max(strong, p.eligible.length) - 1);

@@ -46,7 +46,7 @@ export function simulateSeason(
   const min = strengths[0];
   const max = strengths[n - 1];
 
-  const q = Math.max(0, (teamRating - 35) / 55) ** 1.25;
+  const q = Math.max(0, (teamRating - 35) / 57) ** 1.25;
   let userStrength: number;
   if (q <= 1) {
     const idx = q * (n - 1);
@@ -56,7 +56,7 @@ export function simulateSeason(
   } else {
     // beyond the best real club-season: an all-legend lineup should outclass
     // anything history produced — ramp toward near-certainty
-    const frac = Math.min(1, ((q - 1) / 0.12) ** 0.75);
+    const frac = Math.min(1, ((q - 1) / 0.13) ** 0.85);
     userStrength = max + frac * (0.997 - max);
   }
   userStrength = Math.max(min, Math.min(0.997, userStrength));
