@@ -23,9 +23,17 @@ export interface SimResult {
   };
 }
 
-/** log5 head-to-head win probability in win-share units */
-function log5(a: number, b: number): number {
-  return (a * (1 - b)) / (a * (1 - b) + b * (1 - a));
+/**
+ * Any given Sunday: no side, however stacked, wins a game of footy more than
+ * 94% of the time — injuries, weather and freak days are part of the sport.
+ * This is the main reason 23-0 is legendary: even a perfect team's ceiling
+ * is ~0.94^23 ≈ 24% per season.
+ */
+const UPSET_CAP = 0.94;
+
+/** log5 head-to-head win probability in win-share units, upset-capped */
+function winProb(a: number, b: number): number {
+  return Math.min(UPSET_CAP, (a * (1 - b)) / (a * (1 - b) + b * (1 - a)));
 }
 
 /**
@@ -54,9 +62,9 @@ export function simulateSeason(
     const hi = Math.min(n - 1, lo + 1);
     userStrength = strengths[lo] + (strengths[hi] - strengths[lo]) * (idx - lo);
   } else {
-    // beyond the best real club-season: an all-legend lineup should outclass
-    // anything history produced — ramp toward near-certainty
-    const frac = Math.min(1, ((q - 1) / 0.13) ** 0.85);
+    // beyond the best real club-season: every rating point above history's
+    // best is earned slowly — near-certainty needs a near-perfect side
+    const frac = Math.min(1, (q - 1) / 0.2);
     userStrength = max + frac * (0.997 - max);
   }
   userStrength = Math.max(min, Math.min(0.997, userStrength));
@@ -76,11 +84,16 @@ export function simulateSeason(
     missed: 0, elim: 0, semi: 0, prelim: 0, runnerUp: 0, premiers: 0,
   };
 
+  // schedule strength: no fixture is 23 games against wooden-spooners — the
+  // draw skips the bottom quartile of real teams and leans toward quality
+  const drawOpponent = (rand: () => number) =>
+    strengths[Math.floor((0.25 + 0.75 * rand() ** 0.7) * (n - 1))];
+
   for (let r = 0; r < runs; r++) {
     let wins = 0;
     for (let g = 0; g < 23; g++) {
-      const opp = strengths[Math.floor(rand() * n)];
-      if (rand() < log5(userStrength, opp)) wins++;
+      const opp = drawOpponent(rand);
+      if (rand() < winProb(userStrength, opp)) wins++;
     }
     winCounts[wins]++;
 
@@ -90,7 +103,7 @@ export function simulateSeason(
       outcomes.missed++;
       continue;
     }
-    const beat = (lo: number, hi: number) => rand() < log5(userStrength, sampleBand(rand, lo, hi));
+    const beat = (lo: number, hi: number) => rand() < winProb(userStrength, sampleBand(rand, lo, hi));
     let outcome: FinalsOutcome;
     if (winShare >= top4Share) {
       // top four: qualifying final, a second chance, then prelim and GF
