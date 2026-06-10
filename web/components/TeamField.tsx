@@ -6,9 +6,15 @@ export interface SlotInstance {
   slot: Slot;
   x: number; // % of field width (UTL: bench, x ignored)
   y: number; // % of field height
+  label?: string; // traditional position name shown on empty spots
 }
 
-/** Field placements per mode (UTL renders on the interchange bench strip). */
+/**
+ * Field placements per mode (UTL renders on the interchange bench strip).
+ * Full 23 uses the traditional structure: full-back and half-back lines,
+ * centreline of two wingers and a centre, two followers, one ruck,
+ * half-forward and full-forward lines, five on the bench.
+ */
 const LAYOUTS: Record<Mode, SlotInstance[]> = {
   classic5: [
     { slot: "DEF", x: 50, y: 81 },
@@ -18,14 +24,23 @@ const LAYOUTS: Record<Mode, SlotInstance[]> = {
     { slot: "UTL", x: 50, y: 0 },
   ],
   full23: [
-    { slot: "DEF", x: 28, y: 76 }, { slot: "DEF", x: 50, y: 79 }, { slot: "DEF", x: 72, y: 76 },
-    { slot: "DEF", x: 30, y: 89 }, { slot: "DEF", x: 50, y: 92 }, { slot: "DEF", x: 70, y: 89 },
-    { slot: "MID", x: 22, y: 42 }, { slot: "MID", x: 50, y: 39 }, { slot: "MID", x: 78, y: 42 },
-    { slot: "MID", x: 30, y: 57 }, { slot: "MID", x: 50, y: 61 }, { slot: "MID", x: 70, y: 57 },
-    { slot: "RUC", x: 40, y: 49 }, { slot: "RUC", x: 60, y: 49 },
-    { slot: "FWD", x: 28, y: 24 }, { slot: "FWD", x: 50, y: 21 }, { slot: "FWD", x: 72, y: 24 },
-    { slot: "FWD", x: 30, y: 11 }, { slot: "FWD", x: 50, y: 8 }, { slot: "FWD", x: 70, y: 11 },
+    // back six
+    { slot: "DEF", x: 30, y: 80, label: "BP" }, { slot: "DEF", x: 50, y: 84, label: "FB" },
+    { slot: "DEF", x: 70, y: 80, label: "BP" }, { slot: "DEF", x: 28, y: 69, label: "HB" },
+    { slot: "DEF", x: 50, y: 71.5, label: "CHB" }, { slot: "DEF", x: 72, y: 69, label: "HB" },
+    // centreline + followers
+    { slot: "MID", x: 13, y: 50, label: "W" }, { slot: "MID", x: 50, y: 43, label: "C" },
+    { slot: "MID", x: 87, y: 50, label: "W" },
+    { slot: "MID", x: 40, y: 56, label: "FOL" }, { slot: "MID", x: 60, y: 56, label: "FOL" },
+    // ruck at the bounce
+    { slot: "RUC", x: 50, y: 50, label: "RUC" },
+    // forward six
+    { slot: "FWD", x: 28, y: 30.5, label: "HF" }, { slot: "FWD", x: 50, y: 28, label: "CHF" },
+    { slot: "FWD", x: 72, y: 30.5, label: "HF" }, { slot: "FWD", x: 30, y: 19, label: "FP" },
+    { slot: "FWD", x: 50, y: 16, label: "FF" }, { slot: "FWD", x: 70, y: 19, label: "FP" },
+    // interchange
     { slot: "UTL", x: 0, y: 0 }, { slot: "UTL", x: 0, y: 0 }, { slot: "UTL", x: 0, y: 0 },
+    { slot: "UTL", x: 0, y: 0 }, { slot: "UTL", x: 0, y: 0 },
   ],
   cap23: [],
 };
@@ -42,12 +57,14 @@ export function slotInstances(mode: Mode): SlotInstance[] {
 function Chip({
   pick,
   slot,
+  label,
   selected,
   movable,
   onClick,
 }: {
   pick: Pick | null;
   slot: Slot;
+  label?: string;
   selected: boolean;
   movable: boolean;
   onClick: () => void;
@@ -73,7 +90,7 @@ function Chip({
               : "border-dashed border-white/40 bg-black/20 text-white/60"
         }`}
       >
-        {pick ? Math.round(pick.score) : slot}
+        {pick ? Math.round(pick.score) : (label ?? slot)}
       </span>
       <span
         className={`mt-0.5 max-w-20 truncate rounded px-1 text-center text-[9px] font-bold leading-tight ${
@@ -154,11 +171,12 @@ export default function TeamField({
             )),
           )}
         </svg>
-        {field.map(({ slot, x, y, i }) => (
+        {field.map(({ slot, x, y, i, label }) => (
           <div key={i} className="absolute" style={{ left: `${x}%`, top: `${(y / 100) * 100}%` }}>
             <Chip
               pick={roster[i]}
               slot={slot}
+              label={label}
               selected={selected === i}
               movable={movable}
               onClick={() => onSelect(i)}
@@ -171,7 +189,7 @@ export default function TeamField({
           <p className="text-center text-[9px] uppercase tracking-[0.25em] text-slate-500">
             interchange · utility
           </p>
-          <div className="relative mt-6 flex justify-center gap-14">
+          <div className="relative mt-6 flex justify-center gap-10">
             {bench.map(({ slot, i }) => (
               <div key={i} className="relative h-10 w-4">
                 <Chip

@@ -16,7 +16,7 @@ const MODES: { id: Mode; name: string; tag: string; desc: string }[] = [
     id: "full23",
     name: "Full 23",
     tag: "deep squad",
-    desc: "Draft a full match-day squad: 6 defenders, 6 mids, 2 rucks, 6 forwards, 3 utilities.",
+    desc: "Draft a true match-day 23: back six, forward six, wingers and centre, two followers, a ruck — and five on the bench.",
   },
   {
     id: "cap23",

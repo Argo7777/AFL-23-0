@@ -41,13 +41,15 @@ export const SQUADS: Record<Mode, SlotSpec[]> = {
     { slot: "DEF", count: 1 }, { slot: "MID", count: 1 }, { slot: "RUC", count: 1 },
     { slot: "FWD", count: 1 }, { slot: "UTL", count: 1 },
   ],
+  // traditional structure: back six, centreline (2 wings + centre),
+  // 2 followers, 1 ruck, forward six, 5 on the bench
   full23: [
-    { slot: "DEF", count: 6 }, { slot: "MID", count: 6 }, { slot: "RUC", count: 2 },
-    { slot: "FWD", count: 6 }, { slot: "UTL", count: 3 },
+    { slot: "DEF", count: 6 }, { slot: "MID", count: 5 }, { slot: "RUC", count: 1 },
+    { slot: "FWD", count: 6 }, { slot: "UTL", count: 5 },
   ],
   cap23: [
-    { slot: "DEF", count: 6 }, { slot: "MID", count: 6 }, { slot: "RUC", count: 2 },
-    { slot: "FWD", count: 6 }, { slot: "UTL", count: 3 },
+    { slot: "DEF", count: 6 }, { slot: "MID", count: 5 }, { slot: "RUC", count: 1 },
+    { slot: "FWD", count: 6 }, { slot: "UTL", count: 5 },
   ],
 };
 

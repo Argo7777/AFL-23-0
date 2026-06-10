@@ -1,5 +1,7 @@
 # AFL 23-0 — All-Era Team Builder
 
+**▶ Play it: [danieltomaro13.github.io/AFL-23-0](https://danieltomaro13.github.io/AFL-23-0/)**
+
 Inspired by [23-0.com](https://23-0.com), rebuilt for Aussie rules. Spin a random
 **club + decade** from 130 years of VFL/AFL history, pick a player from that pool,
 place him on the oval — then run a 23-game season simulated against the real teams
@@ -15,7 +17,7 @@ itself is not used).
 | Mode | Squad | Twist |
 |---|---|---|
 | **Classic 5** | DEF · MID · RUC · FWD · UTL | 2 re-rolls |
-| **Full 23** | 6 DEF · 6 MID · 2 RUC · 6 FWD · 3 UTL | 5 re-rolls |
+| **Full 23** | back six · forward six · 2 wingers + centre · 2 followers · 1 ruck · 5 bench | 5 re-rolls |
 | **Salary Cap 23** | as Full 23 | $21.2M cap, pools listed by price, **3 lifelines** to swap a picked player (from his original spin pool) |
 
 Every mode has an **era multi-select** — play all 14 decades (1890s–2020s) or any
