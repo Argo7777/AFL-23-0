@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Mode, Pick } from "@/lib/game/types";
 import { FinalsOutcome, SimResult } from "@/lib/game/sim";
+import { buildShareCard } from "@/lib/game/shareCard";
 import TeamField from "@/components/TeamField";
 
 const FINALS_LABELS: Record<FinalsOutcome, string> = {
@@ -31,9 +32,41 @@ export default function ResultView({
   shareUrl: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const picks = roster.filter((p): p is Pick => p !== null);
   const perfect = sim.wins === 23;
   const maxDist = Math.max(...sim.distribution);
+
+  const shareText = `I went ${sim.wins}-${sim.losses}${
+    sim.finals.modal === "premiers" ? " and won the flag 🏆" : ""
+  } with my all-era AFL team. Build yours:`;
+
+  /** share the rendered card via the native sheet (Instagram & co live
+   *  there); fall back to downloading the PNG on desktop */
+  async function shareImage() {
+    setSharing(true);
+    try {
+      const blob = await buildShareCard(mode, roster, sim, teamRating);
+      const file = new File([blob], "my-afl-23-0-season.png", { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text: `${shareText} ${shareUrl}` });
+      } else {
+        const a = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        a.href = url;
+        a.download = "my-afl-23-0-season.png";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
+    } catch {
+      /* user dismissed the share sheet */
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  const tweetHref = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+  const fbHref = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
 
   return (
     <div className="mx-auto max-w-5xl pop">
@@ -156,24 +189,52 @@ export default function ResultView({
         </div>
       </div>
 
-      <div className="mt-8 flex flex-wrap justify-center gap-3">
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <button
+          onClick={shareImage}
+          disabled={sharing}
+          className="rounded-xl bg-grass px-8 py-3 font-display text-lg font-black text-pitch transition hover:bg-lime-300 disabled:opacity-60"
+        >
+          {sharing ? "PREPARING…" : "SHARE MY SEASON 📸"}
+        </button>
+        <a
+          href={tweetHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-xl border border-line px-6 py-3 font-display text-lg font-black text-slate-200 transition hover:border-grass/50"
+          aria-label="Share on X"
+        >
+          𝕏
+        </a>
+        <a
+          href={fbHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-xl border border-line px-6 py-3 font-display text-lg font-black text-slate-200 transition hover:border-grass/50"
+          aria-label="Share on Facebook"
+        >
+          f
+        </a>
         <button
           onClick={async () => {
             await navigator.clipboard.writeText(shareUrl);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           }}
-          className="rounded-xl bg-grass px-8 py-3 font-display text-lg font-black text-pitch transition hover:bg-lime-300"
+          className="rounded-xl border border-line px-6 py-3 font-display text-lg font-black text-slate-300 transition hover:border-grass/50"
         >
-          {copied ? "COPIED!" : "COPY SHARE LINK"}
+          {copied ? "COPIED!" : "COPY LINK"}
         </button>
         <Link
           href="/"
-          className="rounded-xl border border-line px-8 py-3 font-display text-lg font-black text-slate-300 transition hover:border-grass/50"
+          className="rounded-xl border border-line px-6 py-3 font-display text-lg font-black text-slate-300 transition hover:border-grass/50"
         >
           PLAY AGAIN
         </Link>
       </div>
+      <p className="mt-3 text-center text-xs text-slate-500">
+        The share image works anywhere — Instagram stories, X, Facebook, group chats.
+      </p>
     </div>
   );
 }
