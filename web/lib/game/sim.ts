@@ -24,12 +24,11 @@ export interface SimResult {
 }
 
 /**
- * Any given Sunday: no side, however stacked, wins a game of footy more than
- * 94% of the time — injuries, weather and freak days are part of the sport.
- * This is the main reason 23-0 is legendary: even a perfect team's ceiling
- * is ~0.94^23 ≈ 24% per season.
+ * Any given Sunday: no side, however stacked, escapes the irreducible chance
+ * of an upset — injuries, weather, freak days. The cap bounds a perfect
+ * season at cap^23 for even a flawless team.
  */
-const UPSET_CAP = 0.94;
+const UPSET_CAP = 0.855;
 
 /** log5 head-to-head win probability in win-share units, upset-capped */
 function winProb(a: number, b: number): number {
