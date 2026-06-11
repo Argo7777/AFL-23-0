@@ -56,6 +56,8 @@ function PlayInner() {
   const [rerolls, setRerolls] = useState(REROLLS[mode]);
   const [lifelines, setLifelines] = useState(LIFELINES);
   const [search, setSearch] = useState("");
+  const [posFilter, setPosFilter] = useState<Exclude<Slot, "UTL"> | null>(null);
+  const [capSort, setCapSort] = useState<"desc" | "asc" | "afford">("desc");
   const [pendingPlayer, setPendingPlayer] = useState<PlayerEntry | null>(null);
   const [fieldSel, setFieldSel] = useState<number | null>(null);
   const [swapIndex, setSwapIndex] = useState<number | null>(null);
@@ -97,6 +99,7 @@ function PlayInner() {
     if (allCombos.length === 0) return;
     setPhase("spin");
     setSearch("");
+    setPosFilter(null);
     setPendingPlayer(null);
     for (let attempt = 0; attempt < 40; attempt++) {
       const c = allCombos[Math.floor(rng.current() * allCombos.length)];
@@ -275,17 +278,33 @@ function PlayInner() {
 
   const visiblePool = useMemo(() => {
     const replacingKey = inSwap && roster[swapIndex!] ? roster[swapIndex!]!.player.id.split("|")[0] : null;
-    const base = activePool.filter((p) => {
+    let base = activePool.filter((p) => {
       const key = p.id.split("|")[0];
       return !usedPlayerKeys.has(key) || key === replacingKey;
     });
-    const sorted = isCap ? [...base].sort((a, b) => b.s - a.s) : base;
+    if (posFilter) base = base.filter((p) => p.elig.includes(posFilter));
+    let sorted: PlayerEntry[];
+    if (isCap) {
+      if (capSort === "afford") {
+        // best player you can actually buy, listed first
+        const bestOf = (p: PlayerEntry) =>
+          posFilter ? p.r[posFilter] : Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD);
+        sorted = base.filter((p) => canAfford(p)).sort((a, b) => bestOf(b) - bestOf(a));
+      } else {
+        sorted = [...base].sort((a, b) => (capSort === "asc" ? a.s - b.s : b.s - a.s));
+      }
+    } else if (posFilter) {
+      sorted = [...base].sort((a, b) => b.r[posFilter] - a.r[posFilter]);
+    } else {
+      sorted = base; // pools arrive sorted by best rating
+    }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       return sorted.filter((p) => p.n.toLowerCase().includes(q)).slice(0, 30);
     }
     return sorted.slice(0, 20);
-  }, [activePool, usedPlayerKeys, search, isCap, inSwap, roster, swapIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePool, usedPlayerKeys, search, isCap, inSwap, roster, swapIndex, posFilter, capSort, remainingBudget]);
 
   if (error) {
     return (
@@ -461,8 +480,52 @@ function PlayInner() {
                 placeholder={`Search all ${activePool.length} ${activeCombo.club} players of the ${activeCombo.decade}s…`}
                 className="mt-4 w-full rounded-xl border border-line bg-pitch-light px-4 py-2.5 text-sm outline-none placeholder:text-slate-600 focus:border-grass/60"
               />
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {(["DEF", "MID", "RUC", "FWD"] as const).map((pos) => (
+                  <button
+                    key={pos}
+                    onClick={() => setPosFilter((f) => (f === pos ? null : pos))}
+                    className={`rounded-full border px-3 py-1 font-display text-xs font-black transition ${
+                      posFilter === pos
+                        ? "border-grass bg-grass/15 text-grass"
+                        : "border-line text-slate-400 hover:border-grass/50"
+                    }`}
+                  >
+                    {pos}
+                  </button>
+                ))}
+                {isCap && (
+                  <div className="ml-auto flex gap-1.5">
+                    {([
+                      ["desc", "$ HIGH→LOW"],
+                      ["asc", "$ LOW→HIGH"],
+                      ["afford", "AFFORDABLE"],
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setCapSort(key)}
+                        className={`rounded-full border px-3 py-1 font-display text-xs font-black transition ${
+                          capSort === key
+                            ? "border-gold bg-gold/15 text-gold"
+                            : "border-line text-slate-400 hover:border-gold/50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <p className="mt-2 text-[11px] uppercase tracking-widest text-slate-500">
-                {search ? "search results" : isCap ? "top 20 by salary" : "top 20 rated"}
+                {search
+                  ? "search results"
+                  : isCap
+                    ? capSort === "afford"
+                      ? `best ${posFilter ?? "players"} you can afford`
+                      : `top 20 ${posFilter ? posFilter + "s" : ""} by salary`
+                    : posFilter
+                      ? `top 20 by ${posFilter} rating`
+                      : "top 20 rated"}
               </p>
 
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -473,6 +536,7 @@ function PlayInner() {
                     club={activeCombo.club}
                     showSalary={isCap}
                     disabled={isCap && !canAfford(p)}
+                    ratingPos={posFilter}
                     onPick={() => (inSwap ? confirmLifelineSwap(p) : setPendingPlayer(p))}
                   />
                 ))}

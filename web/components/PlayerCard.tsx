@@ -1,6 +1,6 @@
 "use client";
 
-import { PlayerEntry } from "@/lib/game/types";
+import { PlayerEntry, Slot } from "@/lib/game/types";
 
 const fmtSalary = (s: number) =>
   s >= 1_000_000 ? `$${(s / 1_000_000).toFixed(2)}M` : `$${Math.round(s / 1000)}k`;
@@ -21,15 +21,18 @@ export default function PlayerCard({
   club,
   showSalary,
   disabled,
+  ratingPos,
   onPick,
 }: {
   p: PlayerEntry;
   club: string;
   showSalary: boolean;
   disabled?: boolean;
+  /** show the rating for this position instead of the player's best */
+  ratingPos?: Exclude<Slot, "UTL"> | null;
   onPick: () => void;
 }) {
-  const best = Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD);
+  const best = ratingPos ? p.r[ratingPos] : Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD);
   const hon = honours(p).slice(0, 3);
   const statBits = [
     p.st.di != null && p.st.di > 0 ? `${p.st.di.toFixed(1)} disp` : null,
@@ -61,7 +64,9 @@ export default function PlayerCard({
           <div className="rounded-lg bg-pitch px-2 py-1 font-display text-xl font-black text-grass">
             {Math.round(best)}
           </div>
-          <div className="mt-0.5 text-[10px] font-bold uppercase text-gold">{p.nat}</div>
+          <div className="mt-0.5 text-[10px] font-bold uppercase text-gold">
+            {ratingPos && ratingPos !== p.nat ? `at ${ratingPos} · ${p.nat}` : p.nat}
+          </div>
         </div>
       </div>
       {showSalary && (
