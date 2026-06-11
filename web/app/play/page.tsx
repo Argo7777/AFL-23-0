@@ -481,6 +481,16 @@ function PlayInner() {
                 className="mt-4 w-full rounded-xl border border-line bg-pitch-light px-4 py-2.5 text-sm outline-none placeholder:text-slate-600 focus:border-grass/60"
               />
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setPosFilter(null)}
+                  className={`rounded-full border px-3 py-1 font-display text-xs font-black transition ${
+                    posFilter === null
+                      ? "border-grass bg-grass/15 text-grass"
+                      : "border-line text-slate-400 hover:border-grass/50"
+                  }`}
+                >
+                  ALL
+                </button>
                 {(["DEF", "MID", "RUC", "FWD"] as const).map((pos) => (
                   <button
                     key={pos}
