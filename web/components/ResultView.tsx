@@ -41,25 +41,53 @@ export default function ResultView({
     sim.finals.modal === "premiers" ? " and won the flag 🏆" : ""
   } with my all-era AFL team. Build yours:`;
 
+  async function cardFile(): Promise<File> {
+    const blob = await buildShareCard(mode, roster, sim, teamRating);
+    return new File([blob], "my-afl-23-0-season.png", { type: "image/png" });
+  }
+
+  function downloadCard(file: File) {
+    const a = document.createElement("a");
+    const url = URL.createObjectURL(file);
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
   /** share the rendered card via the native sheet (Instagram & co live
    *  there); fall back to downloading the PNG on desktop */
   async function shareImage() {
     setSharing(true);
     try {
-      const blob = await buildShareCard(mode, roster, sim, teamRating);
-      const file = new File([blob], "my-afl-23-0-season.png", { type: "image/png" });
+      const file = await cardFile();
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], text: `${shareText} ${shareUrl}` });
       } else {
-        const a = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        a.href = url;
-        a.download = "my-afl-23-0-season.png";
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        downloadCard(file);
       }
     } catch {
       /* user dismissed the share sheet */
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  /** Instagram has no web share intent: on mobile the share sheet (with the
+   *  image attached) is the official route in; on desktop, download the card
+   *  and open Instagram so it can be posted manually */
+  async function shareInstagram() {
+    setSharing(true);
+    try {
+      const file = await cardFile();
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text: `${shareText} ${shareUrl}` });
+      } else {
+        downloadCard(file);
+        window.open("https://www.instagram.com/", "_blank", "noopener");
+      }
+    } catch {
+      /* dismissed */
     } finally {
       setSharing(false);
     }
@@ -196,6 +224,18 @@ export default function ResultView({
           className="rounded-xl bg-grass px-8 py-3 font-display text-lg font-black text-pitch transition hover:bg-lime-300 disabled:opacity-60"
         >
           {sharing ? "PREPARING…" : "SHARE MY SEASON 📸"}
+        </button>
+        <button
+          onClick={shareInstagram}
+          disabled={sharing}
+          className="rounded-xl border border-line px-5 py-3 transition hover:border-grass/50 disabled:opacity-60"
+          aria-label="Share on Instagram"
+        >
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" className="text-slate-200" />
+            <circle cx="12" cy="12" r="4.5" className="text-slate-200" />
+            <circle cx="17.5" cy="6.5" r="1.3" fill="currentColor" stroke="none" className="text-slate-200" />
+          </svg>
         </button>
         <a
           href={tweetHref}
