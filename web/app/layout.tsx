@@ -57,6 +57,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        {/* Cloudflare Web Analytics — privacy-friendly, no cookies */}
+        <script
+          defer
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token": "b75504cea85842969120dffc5b746484"}'
+        />
       </body>
     </html>
   );
