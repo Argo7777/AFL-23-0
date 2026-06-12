@@ -43,6 +43,91 @@ function winProb(a: number, b: number): number {
   return Math.min(UPSET_CAP, (a * (1 - b)) / (a * (1 - b) + b * (1 - a)));
 }
 
+/** map a team rating onto the real strength distribution (sorted ascending) */
+export function ratingToStrength(teamRating: number, strengths: number[]): number {
+  const n = strengths.length;
+  const min = strengths[0];
+  const max = strengths[n - 1];
+  const q = Math.max(0, (teamRating - 35) / 57) ** 1.25;
+  let s: number;
+  if (q <= 1) {
+    const idx = q * (n - 1);
+    const lo = Math.floor(idx);
+    const hi = Math.min(n - 1, lo + 1);
+    s = strengths[lo] + (strengths[hi] - strengths[lo]) * (idx - lo);
+  } else {
+    s = max + Math.min(1, (q - 1) / 0.2) * (0.997 - max);
+  }
+  return Math.max(min, Math.min(0.997, s));
+}
+
+/** best-of-5 showdown between two teams — your roster vs a mate's */
+export interface SeriesResult {
+  games: boolean[]; // from my perspective
+  myWins: number;
+  theirWins: number;
+  won: boolean;
+}
+
+export function simulateSeries(
+  myRating: number,
+  theirRating: number,
+  strengths: number[],
+  seed: number,
+): SeriesResult {
+  const me = ratingToStrength(myRating, strengths);
+  const them = ratingToStrength(theirRating, strengths);
+  // head-to-head: cap symmetrically so neither side is a lock
+  const p = Math.max(1 - UPSET_CAP, Math.min(UPSET_CAP, (me * (1 - them)) / (me * (1 - them) + them * (1 - me))));
+  const rand = mulberry32(seed ^ 0xd0e1);
+  const games: boolean[] = [];
+  let my = 0, their = 0;
+  while (my < 3 && their < 3) {
+    const win = rand() < p;
+    games.push(win);
+    if (win) my++;
+    else their++;
+  }
+  return { games, myWins: my, theirWins: their, won: my === 3 };
+}
+
+/** the Gauntlet: survive every decade of history in sequence */
+export interface GauntletLeg {
+  decade: number;
+  wins: number;
+  losses: number;
+  survived: boolean; // 12+ wins to advance
+}
+
+export function simulateGauntlet(
+  teamRating: number,
+  strengthsByDecade: Record<string, [number, string][]>,
+  seed: number,
+): GauntletLeg[] {
+  const legs: GauntletLeg[] = [];
+  const decades = Object.keys(strengthsByDecade).map(Number).sort((a, b) => a - b);
+  for (const d of decades) {
+    const values = strengthsByDecade[String(d)].map((p) => p[0]).sort((a, b) => a - b);
+    if (values.length < 8) continue;
+    const s = ratingToStrength(teamRating, values);
+    const n = values.length;
+    const rand = mulberry32((seed ^ d) >>> 0);
+    const wc = new Array(24).fill(0);
+    for (let r = 0; r < 2000; r++) {
+      let w = 0;
+      for (let g = 0; g < 23; g++) {
+        const opp = values[Math.floor((0.25 + 0.75 * rand() ** 0.7) * (n - 1))];
+        if (rand() < winProb(s, opp)) w++;
+      }
+      wc[w]++;
+    }
+    let modal = 0;
+    for (let w = 0; w < 24; w++) if (wc[w] >= wc[modal]) modal = w;
+    legs.push({ decade: d, wins: modal, losses: 23 - modal, survived: modal >= 12 });
+  }
+  return legs;
+}
+
 /**
  * Map the team rating (0-100) onto the REAL strength distribution of club
  * seasons from the selected decades, then Monte-Carlo a 23-game season plus
@@ -58,23 +143,7 @@ export function simulateSeason(
   runs = 10_000,
 ): SimResult {
   const n = strengths.length;
-  const min = strengths[0];
-  const max = strengths[n - 1];
-
-  const q = Math.max(0, (teamRating - 35) / 57) ** 1.25;
-  let userStrength: number;
-  if (q <= 1) {
-    const idx = q * (n - 1);
-    const lo = Math.floor(idx);
-    const hi = Math.min(n - 1, lo + 1);
-    userStrength = strengths[lo] + (strengths[hi] - strengths[lo]) * (idx - lo);
-  } else {
-    // beyond the best real club-season: every rating point above history's
-    // best is earned slowly — near-certainty needs a near-perfect side
-    const frac = Math.min(1, (q - 1) / 0.2);
-    userStrength = max + frac * (0.997 - max);
-  }
-  userStrength = Math.max(min, Math.min(0.997, userStrength));
+  const userStrength = ratingToStrength(teamRating, strengths);
 
   const realPercentile = (strengths.filter((s) => s < userStrength).length / n) * 100;
 

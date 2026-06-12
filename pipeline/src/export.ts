@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { db } from "./lib/db.js";
 import { computeRatings, PlayerDecade } from "./compute/ratings.js";
 import { computeTeamStrengths } from "./compute/team-strengths.js";
 import {
@@ -56,6 +57,9 @@ export function exportData() {
         g: p.games,
         h: p.height,
         y: p.years,
+        sea: [...p.seasons.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([yr, s]) => [yr, ...s]),
         c: Object.fromEntries(p.clubs),
         r: p.posRating,
         nat: p.natural,
@@ -95,6 +99,32 @@ export function exportData() {
   }
   for (const d of Object.keys(strengthsByDecade)) strengthsByDecade[d].sort((a, b) => a[0] - b[0]);
   writeFileSync(join(OUT_DIR, "strengths.json"), JSON.stringify(strengthsByDecade));
+
+  // ---- on this day ----
+  // for each calendar day: prefer the most recent Grand Final, then any
+  // final, then the biggest-margin home-and-away game played on that day
+  const MONTHS: Record<string, string> = {
+    Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+    Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12",
+  };
+  const matchRows = db
+    .prepare(`SELECT date, year, round, team1, score1, team2, score2 FROM matches`)
+    .all() as { date: string; year: number; round: string; team1: string; score1: number; team2: string; score2: number }[];
+  const byDay = new Map<string, { score: number; m: (typeof matchRows)[0] }>();
+  for (const m of matchRows) {
+    const parts = m.date.split("-"); // "27-Sep-2025"
+    if (parts.length !== 3 || !MONTHS[parts[1]]) continue;
+    const key = `${MONTHS[parts[1]]}-${parts[0].padStart(2, "0")}`;
+    const finalsRank = m.round === "GF" ? 3 : /^(PF|SF|QF|EF)$/.test(m.round) ? 2 : 1;
+    const score = finalsRank * 1_000_000 + m.year * 100 + Math.min(99, Math.abs(m.score1 - m.score2));
+    const prev = byDay.get(key);
+    if (!prev || score > prev.score) byDay.set(key, { score, m });
+  }
+  const onThisDay: Record<string, unknown> = {};
+  for (const [k, { m }] of byDay) {
+    onThisDay[k] = { y: m.year, r: m.round, t1: m.team1, s1: m.score1, t2: m.team2, s2: m.score2 };
+  }
+  writeFileSync(join(OUT_DIR, "onthisday.json"), JSON.stringify(onThisDay));
 
   // ---- meta: which clubs exist per decade (from real fixtures) ----
   const clubsByDecade: Record<string, string[]> = {};

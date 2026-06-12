@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { loadMeta } from "@/lib/game/data";
+import { BASE_PATH, loadMeta } from "@/lib/game/data";
 import {
   Badge, badges, dailyNumber, GameRecord, readProfile, summary, todaysDaily,
 } from "@/lib/game/profile";
@@ -27,6 +27,18 @@ const MODES: { id: Mode; name: string; tag: string; desc: string }[] = [
     tag: "hard mode",
     desc: "Full 23 under a salary cap. Stars cost a fortune — spend like a list manager.",
   },
+  {
+    id: "gauntlet",
+    name: "The Gauntlet",
+    tag: "survival",
+    desc: "Pick five, then survive every decade of history in order — 12+ wins in each era or the run ends.",
+  },
+  {
+    id: "spoon",
+    name: "Wooden Spoon",
+    tag: "anti-footy",
+    desc: "Build the WORST side imaginable and chase a perfect 0-23. Harder than it sounds.",
+  },
 ];
 
 export default function Home() {
@@ -35,6 +47,8 @@ export default function Home() {
   const [eras, setEras] = useState<Set<number>>(new Set());
   const [daily, setDaily] = useState<GameRecord | null>(null);
   const [prof, setProf] = useState<{ s: ReturnType<typeof summary>; b: Badge[] } | null>(null);
+  const [oneClub, setOneClub] = useState("");
+  const [otd, setOtd] = useState<{ y: number; r: string; t1: string; s1: number; t2: string; s2: number } | null>(null);
 
   useEffect(() => {
     loadMeta().then((m) => {
@@ -45,6 +59,14 @@ export default function Home() {
     setDaily(todaysDaily() ?? null);
     const p = readProfile();
     setProf({ s: summary(p), b: badges(p) });
+    // today's slice of footy history (Melbourne time)
+    const key = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Australia/Melbourne", month: "2-digit", day: "2-digit",
+    }).format(new Date()).replace("/", "-");
+    fetch(`${BASE_PATH}/data/onthisday.json`)
+      .then((r) => r.json())
+      .then((d) => setOtd(d[key] ?? null))
+      .catch(() => {});
   }, []);
 
   const toggleEra = (d: number) => {
@@ -180,6 +202,57 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* one-club legends */}
+      <section className="mt-8 rounded-2xl border border-line bg-pitch-light p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display text-xl font-black">One-Club Legends</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Build the best 23 in your club&apos;s history — spins roll only the decades your club existed.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={oneClub}
+              onChange={(e) => setOneClub(e.target.value)}
+              className="rounded-xl border border-line bg-card px-3 py-2 font-display text-sm font-black text-slate-200 outline-none focus:border-grass/60"
+            >
+              <option value="">Pick your club…</option>
+              {meta &&
+                [...new Set(Object.values(meta.clubsByDecade).flat())].sort().map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+            </select>
+            <Link
+              href={oneClub ? `/play?mode=full23&club=${encodeURIComponent(oneClub)}` : "#"}
+              aria-disabled={!oneClub}
+              className={`rounded-xl px-5 py-2 font-display text-sm font-black ${
+                oneClub
+                  ? "bg-grass text-pitch hover:bg-lime-300"
+                  : "pointer-events-none border border-line text-slate-600"
+              }`}
+            >
+              DRAFT →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* on this day */}
+      {otd && (
+        <section className="mt-8 rounded-2xl border border-line bg-pitch-light px-5 py-4 text-center">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            on this day in {otd.y}
+          </span>
+          <p className="mt-1 text-sm text-slate-300">
+            <b className={otd.s1 > otd.s2 ? "text-grass" : ""}>{otd.t1} {otd.s1}</b>
+            {" "}{otd.s1 > otd.s2 ? "defeated" : otd.s1 === otd.s2 ? "drew with" : "fell to"}{" "}
+            <b className={otd.s2 > otd.s1 ? "text-grass" : ""}>{otd.t2} {otd.s2}</b>
+            {otd.r === "GF" ? " in the Grand Final" : /^(PF|SF|QF|EF)$/.test(otd.r) ? " in a final" : ` in round ${otd.r.slice(1)}`}.
+          </p>
+        </section>
+      )}
 
       {/* more games */}
       <section className="mt-8 grid gap-4 sm:grid-cols-3">

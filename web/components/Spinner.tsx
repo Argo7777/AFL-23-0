@@ -3,6 +3,26 @@
 import { useEffect, useRef, useState } from "react";
 import { clubColors } from "@/lib/game/clubColors";
 
+// pokie-style ticks via WebAudio; silently no-ops where audio is blocked
+let audioCtx: AudioContext | null = null;
+function blip(freq: number, durMs: number, gainV = 0.04) {
+  try {
+    audioCtx ??= new AudioContext();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "square";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(gainV, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + durMs / 1000);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + durMs / 1000);
+  } catch {
+    /* audio unavailable */
+  }
+}
+
 /** Slot-machine style reveal of the rolled club + era. Pure presentation. */
 export default function Spinner({
   decade,
@@ -29,10 +49,13 @@ export default function Spinner({
         clearInterval(interval);
         setDisplay({ decade, club });
         setSettled(true);
+        blip(880, 220, 0.06); // the reveal ding
+        try { navigator.vibrate?.(60); } catch { /* no haptics */ }
         setTimeout(onDone, 450);
         return;
       }
       tick.current++;
+      if (tick.current % 2 === 0) blip(220 + tick.current * 14, 40);
       const c = candidates[(tick.current * 7) % Math.max(1, candidates.length)];
       if (c) setDisplay(c);
     }, 85);

@@ -24,6 +24,7 @@ export default function PlayerCard({
   disabled,
   ratingPos,
   onPick,
+  onInfo,
 }: {
   p: PlayerEntry;
   club: string;
@@ -32,6 +33,8 @@ export default function PlayerCard({
   /** show the rating for this position instead of the player's best */
   ratingPos?: Exclude<Slot, "UTL"> | null;
   onPick: () => void;
+  /** open the season-by-season career sheet */
+  onInfo?: () => void;
 }) {
   const best = ratingPos ? p.r[ratingPos] : Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD);
   const hon = honours(p).slice(0, 3);
@@ -56,7 +59,24 @@ export default function PlayerCard({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate font-display text-lg font-black">{p.n}</div>
+          <div className="truncate font-display text-lg font-black">
+            {p.n}
+            {onInfo && (
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label={`${p.n} career stats`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onInfo();
+                }}
+                onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), onInfo())}
+                className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-line align-middle text-[10px] font-bold text-slate-400 hover:border-ice hover:text-ice"
+              >
+                i
+              </span>
+            )}
+          </div>
           <div className="mt-0.5 text-[11px] text-slate-400">
             {p.g} games · {p.y[0]}–{p.y[1]} · {club}
             {p.h ? ` · ${p.h}cm` : ""}

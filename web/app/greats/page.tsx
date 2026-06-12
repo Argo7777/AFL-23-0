@@ -5,18 +5,23 @@ import Link from "next/link";
 import { loadDecade, loadMeta } from "@/lib/game/data";
 import { clubColors } from "@/lib/game/clubColors";
 import { honours } from "@/components/PlayerCard";
+import PlayerSheet from "@/components/PlayerSheet";
 import { PlayerEntry } from "@/lib/game/types";
 
 export default function GreatsPage() {
   const [decades, setDecades] = useState<number[]>([]);
   const [decade, setDecade] = useState(0);
   const [pos, setPos] = useState<"ALL" | "DEF" | "MID" | "RUC" | "FWD">("ALL");
+  const [club, setClub] = useState("ALL");
+  const [clubs, setClubs] = useState<string[]>([]);
   const [pool, setPool] = useState<PlayerEntry[]>([]);
+  const [sheet, setSheet] = useState<PlayerEntry | null>(null);
 
   useEffect(() => {
     loadMeta().then((m) => {
       setDecades(m.decades);
       setDecade(m.decades[m.decades.length - 1]);
+      setClubs([...new Set(Object.values(m.clubsByDecade).flat())].sort());
     });
   }, []);
 
@@ -28,6 +33,7 @@ export default function GreatsPage() {
     pos === "ALL" ? Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD) : p.r[pos];
   const top = [...pool]
     .filter((p) => pos === "ALL" || p.elig.includes(pos))
+    .filter((p) => club === "ALL" || p.c[club])
     .sort((a, b) => best(b) - best(a))
     .slice(0, 25);
 
@@ -54,7 +60,7 @@ export default function GreatsPage() {
           </button>
         ))}
       </div>
-      <div className="mt-2 flex gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {(["ALL", "DEF", "MID", "RUC", "FWD"] as const).map((p) => (
           <button
             key={p}
@@ -66,6 +72,16 @@ export default function GreatsPage() {
             {p}
           </button>
         ))}
+        <select
+          value={club}
+          onChange={(e) => setClub(e.target.value)}
+          className="ml-auto rounded-full border border-line bg-pitch-light px-3 py-1 font-display text-xs font-black text-slate-300 outline-none focus:border-grass/60"
+        >
+          <option value="ALL">ALL CLUBS</option>
+          {clubs.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
       </div>
 
       <div className="mt-4 grid gap-1.5">
@@ -73,10 +89,11 @@ export default function GreatsPage() {
           const club = Object.keys(p.c)[0] ?? "";
           const hon = honours(p).slice(0, 3);
           return (
-            <div
+            <button
               key={p.id}
-              className="flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2"
-              style={{ borderLeft: `4px solid ${clubColors(club)[0]}` }}
+              onClick={() => setSheet(p)}
+              className="flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2 text-left transition hover:border-ice/50"
+              style={{ borderLeft: `4px solid ${clubColors(Object.keys(p.c)[0] ?? "")[0]}` }}
             >
               <span className="w-7 shrink-0 text-right font-display text-sm font-black text-slate-500">
                 {i + 1}
@@ -101,11 +118,13 @@ export default function GreatsPage() {
               <span className="shrink-0 rounded-lg bg-pitch px-2 py-1 font-display text-lg font-black text-grass">
                 {Math.round(best(p))}
               </span>
-            </div>
+            </button>
           );
         })}
         {top.length === 0 && <p className="text-sm text-slate-500">loading the {decade}s…</p>}
       </div>
+
+      {sheet && <PlayerSheet p={sheet} onClose={() => setSheet(null)} />}
 
       <p className="mt-6 text-center">
         <Link

@@ -43,8 +43,12 @@ const LAYOUTS: Record<Mode, SlotInstance[]> = {
     { slot: "UTL", x: 0, y: 0 }, { slot: "UTL", x: 0, y: 0 },
   ],
   cap23: [],
+  gauntlet: [],
+  spoon: [],
 };
 LAYOUTS.cap23 = LAYOUTS.full23;
+LAYOUTS.gauntlet = LAYOUTS.classic5;
+LAYOUTS.spoon = LAYOUTS.classic5;
 
 export function slotInstances(mode: Mode): SlotInstance[] {
   const layout = LAYOUTS[mode];

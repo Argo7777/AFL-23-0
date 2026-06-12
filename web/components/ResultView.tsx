@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Mode, Pick } from "@/lib/game/types";
-import { FinalsOutcome, SimResult } from "@/lib/game/sim";
+import { FinalsOutcome, SeriesResult, SimResult } from "@/lib/game/sim";
 import { buildShareCard } from "@/lib/game/shareCard";
-import { dailyNumber } from "@/lib/game/profile";
+import { Badge, dailyNumber } from "@/lib/game/profile";
 import Confetti from "@/components/Confetti";
 import TeamField from "@/components/TeamField";
 
@@ -29,6 +29,9 @@ export default function ResultView({
   oppLabels,
   targetRecord,
   daily,
+  spoon,
+  series,
+  newBadges,
 }: {
   mode: Mode;
   roster: (Pick | null)[];
@@ -40,12 +43,15 @@ export default function ResultView({
   oppLabels: string[];
   targetRecord?: string | null;
   daily?: boolean;
+  spoon?: boolean;
+  series?: SeriesResult | null;
+  newBadges?: Badge[];
 }) {
   const [copied, setCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
   const picks = roster.filter((p): p is Pick => p !== null);
-  const perfect = sim.wins === 23;
+  const perfect = spoon ? sim.wins === 0 : sim.wins === 23;
   const maxDist = Math.max(...sim.distribution);
 
   const targetWins = targetRecord ? Number(targetRecord.split("-")[0]) : null;
@@ -55,9 +61,13 @@ export default function ResultView({
     ? `AFL 23-0 Daily #${dailyNumber()}: ${sim.wins}-${sim.losses}${
         sim.finals.modal === "premiers" ? " 🏆" : ""
       }${perfect ? " — PERFECTION" : ""}. Play today's:`
-    : `I went ${sim.wins}-${sim.losses}${
-        sim.finals.modal === "premiers" ? " and won the flag 🏆" : ""
-      } with my all-era AFL team. Build yours:`;
+    : spoon
+      ? `I went ${sim.wins}-${sim.losses} chasing the wooden spoon 🥄${
+          perfect ? " — PERFECT SPOON!" : ""
+        } on AFL 23-0. Build worse:`
+      : `I went ${sim.wins}-${sim.losses}${
+          sim.finals.modal === "premiers" ? " and won the flag 🏆" : ""
+        } with my all-era AFL team. Build yours:`;
 
   async function cardFile(): Promise<File> {
     const blob = await buildShareCard(mode, roster, sim, teamRating);
@@ -116,10 +126,10 @@ export default function ResultView({
 
   return (
     <div className="mx-auto max-w-5xl pop">
-      {(sim.finals.modal === "premiers" || perfect) && <Confetti big={perfect} />}
+      {((!spoon && sim.finals.modal === "premiers") || perfect) && <Confetti big={perfect} />}
       <div className="text-center">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-          {daily ? `daily challenge #${dailyNumber()}` : "your season"}
+          {daily ? `daily challenge #${dailyNumber()}` : spoon ? "the spoon chase" : "your season"}
         </p>
         <div
           className={`font-display mt-2 text-6xl font-black sm:text-8xl ${
@@ -128,9 +138,41 @@ export default function ResultView({
         >
           {sim.wins}–{sim.losses}
         </div>
-        {sim.finals.modal === "premiers" && (
+        {!spoon && sim.finals.modal === "premiers" && (
           <div className="font-display mt-1 text-2xl font-black text-gold sm:text-3xl">
             🏆 PREMIERS
+          </div>
+        )}
+        {spoon && perfect && (
+          <div className="font-display mt-1 text-2xl font-black text-grass sm:text-3xl">
+            🥄 PERFECT SPOON
+          </div>
+        )}
+        {newBadges && newBadges.length > 0 && (
+          <div className="pop mt-3 flex flex-wrap items-center justify-center gap-1.5">
+            {newBadges.map((b) => (
+              <span
+                key={b.label}
+                className="rounded-full border border-gold bg-gold/15 px-3 py-1 text-xs font-bold text-gold"
+              >
+                NEW BADGE · {b.emoji} {b.label}
+              </span>
+            ))}
+          </div>
+        )}
+        {series && (
+          <div
+            className={`font-display mt-3 inline-block rounded-xl border px-4 py-2 text-lg font-black ${
+              series.won ? "border-grass bg-grass/10 text-grass" : "border-hot bg-hot/10 text-hot"
+            }`}
+          >
+            ⚔️ SHOWDOWN {series.won ? "WON" : "LOST"} {series.myWins}–{series.theirWins}
+            <span className="ml-2 align-middle text-sm">
+              {series.games.map((g, i) => (g ? "🟢" : "🔴")).join("")}
+            </span>
+            <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              best-of-5 vs their actual team
+            </div>
           </div>
         )}
         {beatTarget != null && (
@@ -151,17 +193,23 @@ export default function ResultView({
           </div>
         )}
         <p className="mt-2 text-slate-300">
-          {perfect && sim.finals.modal === "premiers"
-            ? "PERFECTION. Undefeated, and the flag to prove it."
-            : sim.finals.modal === "premiers"
-              ? "A September juggernaut — this side salutes more often than not."
-              : sim.wins >= 20
-                ? "An all-time great season — September is theirs to lose."
-                : sim.finals.modal !== "missed"
-                  ? `Finals footy: most seasons end in a ${FINALS_LABELS[sim.finals.modal].toLowerCase()}.`
-                  : sim.wins >= 10
-                    ? "Mid-table. September watches on from the couch."
-                    : "Back to the drawing board, coach."}
+          {spoon
+            ? perfect
+              ? "Flawless incompetence. Not a single accidental win."
+              : sim.wins <= 3
+                ? "Gloriously bad — but those wins cost you the spoon."
+                : "Too talented for the spoon. Try drafting worse."
+            : perfect && sim.finals.modal === "premiers"
+              ? "PERFECTION. Undefeated, and the flag to prove it."
+              : sim.finals.modal === "premiers"
+                ? "A September juggernaut — this side salutes more often than not."
+                : sim.wins >= 20
+                  ? "An all-time great season — September is theirs to lose."
+                  : sim.finals.modal !== "missed"
+                    ? `Finals footy: most seasons end in a ${FINALS_LABELS[sim.finals.modal].toLowerCase()}.`
+                    : sim.wins >= 10
+                      ? "Mid-table. September watches on from the couch."
+                      : "Back to the drawing board, coach."}
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-slate-400">
           <span>
@@ -171,12 +219,20 @@ export default function ResultView({
             Better than <b className="text-slate-100">{sim.realPercentile.toFixed(1)}%</b> of real{" "}
             {eras.length > 4 ? "all-era" : eras.map((e) => `${e}s`).join("/")} teams
           </span>
-          <span>
-            Goes 23-0 in <b className="text-slate-100">{sim.perfectPct.toFixed(1)}%</b> of seasons
-          </span>
-          <span>
-            Wins the flag in <b className="text-gold">{sim.finals.premiersPct.toFixed(1)}%</b>
-          </span>
+          {spoon ? (
+            <span>
+              Goes 0-23 in <b className="text-slate-100">{sim.distribution[0].toFixed(1)}%</b> of seasons
+            </span>
+          ) : (
+            <>
+              <span>
+                Goes 23-0 in <b className="text-slate-100">{sim.perfectPct.toFixed(1)}%</b> of seasons
+              </span>
+              <span>
+                Wins the flag in <b className="text-gold">{sim.finals.premiersPct.toFixed(1)}%</b>
+              </span>
+            </>
+          )}
         </div>
       </div>
 

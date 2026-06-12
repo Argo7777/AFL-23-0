@@ -45,6 +45,8 @@ export interface PlayerDecade {
   eligible: Position[];
   posSource: string;
   utlMult: number;
+  /** year -> [games, disposals|null, goals|null, brownlow votes|null] */
+  seasons: Map<number, [number, number | null, number | null, number | null]>;
   best: number;
 }
 
@@ -110,7 +112,7 @@ export function computeRatings(): PlayerDecade[] {
         br: 0, brWins: 0, brTop10: 0, aaTeam: 0, aaSquad: 0, aaLines: {}, colemanTop1: 0,
         colemanTop3: 0, premierships: 0, risingStarWin: 0, accScore: 0,
         posRating: { DEF: 0, MID: 0, RUC: 0, FWD: 0 }, natural: "MID",
-        eligible: [], posSource: "stats", utlMult: 1, best: 0,
+        eligible: [], posSource: "stats", utlMult: 1, best: 0, seasons: new Map(),
       };
       byPD.set(id, pd);
     }
@@ -126,6 +128,18 @@ export function computeRatings(): PlayerDecade[] {
       const v = r[s] as number | null;
       if (v != null) pd.totals[s] = (pd.totals[s] ?? 0) + v;
     }
+
+    // per-season line for the career sheet: [gm, disposals, goals, votes]
+    const ki = r.ki as number | null;
+    const hb = r.hb as number | null;
+    const di = ki != null || hb != null ? (ki ?? 0) + (hb ?? 0) : null;
+    const sea = pd.seasons.get(r.year) ?? [0, null, null, null];
+    sea[0] += r.gm ?? 0;
+    if (di != null) sea[1] = (sea[1] ?? 0) + di;
+    const glv = r.gl as number | null;
+    if (glv != null) sea[2] = (sea[2] ?? 0) + glv;
+    if (r.br != null) sea[3] = (sea[3] ?? 0) + r.br;
+    pd.seasons.set(r.year, sea);
 
     const norm = normalizeName(r.player_name);
     // index under full name, diminutive-folded name, and "initial surname"

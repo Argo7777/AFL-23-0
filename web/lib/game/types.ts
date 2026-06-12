@@ -19,6 +19,8 @@ export interface PlayerEntry {
     col: number; c3: number; pr: number; rs: number; acc: number;
   };
   st: { di: number | null; gl: number | null; mk: number | null; tk: number | null; ho: number | null };
+  /** career sheet: [year, games, disposals|null, goals|null, brownlow votes|null] */
+  sea?: [number, number, number | null, number | null, number | null][];
 }
 
 export interface Meta {
@@ -30,7 +32,7 @@ export interface Meta {
   sources: string[];
 }
 
-export type Mode = "classic5" | "full23" | "cap23";
+export type Mode = "classic5" | "full23" | "cap23" | "gauntlet" | "spoon";
 
 export interface SlotSpec {
   slot: Slot;
@@ -52,9 +54,20 @@ export const SQUADS: Record<Mode, SlotSpec[]> = {
     { slot: "DEF", count: 6 }, { slot: "MID", count: 5 }, { slot: "RUC", count: 1 },
     { slot: "FWD", count: 6 }, { slot: "UTL", count: 5 },
   ],
+  // gauntlet & spoon play with the classic five
+  gauntlet: [
+    { slot: "DEF", count: 1 }, { slot: "MID", count: 1 }, { slot: "RUC", count: 1 },
+    { slot: "FWD", count: 1 }, { slot: "UTL", count: 1 },
+  ],
+  spoon: [
+    { slot: "DEF", count: 1 }, { slot: "MID", count: 1 }, { slot: "RUC", count: 1 },
+    { slot: "FWD", count: 1 }, { slot: "UTL", count: 1 },
+  ],
 };
 
-export const REROLLS: Record<Mode, number> = { classic5: 2, full23: 5, cap23: 5 };
+export const REROLLS: Record<Mode, number> = {
+  classic5: 2, full23: 5, cap23: 5, gauntlet: 2, spoon: 2,
+};
 
 export interface Pick {
   player: PlayerEntry;

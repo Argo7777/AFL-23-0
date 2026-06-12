@@ -6,13 +6,17 @@ import Link from "next/link";
 import { BASE_PATH, loadMeta, loadPool, loadStrengths, poolStrengths } from "@/lib/game/data";
 import { dailySeed, recordGame, todayMelbourne } from "@/lib/game/profile";
 import { mulberry32, randomSeed } from "@/lib/game/rng";
-import { simulateSeason, SimResult } from "@/lib/game/sim";
+import {
+  GauntletLeg, SeriesResult, simulateGauntlet, simulateSeason, simulateSeries, SimResult,
+} from "@/lib/game/sim";
 import {
   Meta, Mode, Pick, PlayerEntry, Slot, REROLLS, scoreInSlot,
 } from "@/lib/game/types";
 import { clubColors } from "@/lib/game/clubColors";
 import Spinner from "@/components/Spinner";
 import PlayerCard, { fmtSalary, honours } from "@/components/PlayerCard";
+import GauntletResult from "@/components/GauntletResult";
+import PlayerSheet from "@/components/PlayerSheet";
 import ResultView from "@/components/ResultView";
 import TeamField, { slotInstances } from "@/components/TeamField";
 
@@ -44,6 +48,10 @@ function PlayInner() {
   const shared = params.get("d");
   const isDaily = params.get("daily") === "1";
   const targetRecord = params.get("target"); // a mate's "20-3" to beat
+  const targetRating = Number(params.get("trating")) || null; // for the showdown
+  const lockedClub = params.get("club"); // one-club legends
+  const isSpoon = mode === "spoon";
+  const isGauntlet = mode === "gauntlet";
 
   const instances = useMemo(() => slotInstances(mode), [mode]);
   const totalPicks = instances.length;
@@ -67,6 +75,7 @@ function PlayInner() {
   const [posFilter, setPosFilter] = useState<Exclude<Slot, "UTL"> | null>(null);
   const [capSort, setCapSort] = useState<"desc" | "asc" | "afford">("desc");
   const [pendingPlayer, setPendingPlayer] = useState<PlayerEntry | null>(null);
+  const [sheetPlayer, setSheetPlayer] = useState<PlayerEntry | null>(null);
   const [fieldSel, setFieldSel] = useState<number | null>(null);
   const [undoSnap, setUndoSnap] = useState<{
     roster: (Pick | null)[];
@@ -76,6 +85,9 @@ function PlayInner() {
   const [swapIndex, setSwapIndex] = useState<number | null>(null);
   const [swapPool, setSwapPool] = useState<PlayerEntry[]>([]);
   const [sim, setSim] = useState<SimResult | null>(null);
+  const [gauntletLegs, setGauntletLegs] = useState<GauntletLeg[] | null>(null);
+  const [series, setSeries] = useState<SeriesResult | null>(null);
+  const [newBadges, setNewBadges] = useState<{ emoji: string; label: string }[]>([]);
   const [teamRating, setTeamRating] = useState(0);
   const [shareUrl, setShareUrl] = useState("");
   const [challengeUrl, setChallengeUrl] = useState("");
@@ -105,10 +117,13 @@ function PlayInner() {
     if (!meta) return [];
     const out: Combo[] = [];
     for (const d of eras) {
-      for (const club of meta.clubsByDecade[String(d)] ?? []) out.push({ decade: d, club });
+      for (const club of meta.clubsByDecade[String(d)] ?? []) {
+        if (lockedClub && club !== lockedClub) continue; // one-club legends
+        out.push({ decade: d, club });
+      }
     }
     return out;
-  }, [meta, eras]);
+  }, [meta, eras, lockedClub]);
 
   const rollCombo = useCallback(async (): Promise<void> => {
     if (allCombos.length === 0) return;
@@ -158,9 +173,14 @@ function PlayInner() {
             }
           }
         }
-        if (isDaily) {
-          // the daily plays the full 130 years, same for everyone
+        if (isDaily || isGauntlet) {
+          // daily & gauntlet play the full 130 years
           setEras(m.decades);
+          return;
+        }
+        if (lockedClub) {
+          // one-club legends: every decade the club existed
+          setEras(m.decades.filter((d) => (m.clubsByDecade[String(d)] ?? []).includes(lockedClub)));
           return;
         }
         const eraParam = params.get("eras");
@@ -195,10 +215,30 @@ function PlayInner() {
     const strengths = await loadStrengths();
     const { values, labels } = poolStrengths(strengths, finalEras);
     const rating = filled.reduce((a, p) => a + p.score, 0) / filled.length;
-    const result = simulateSeason(rating, values, simSeed);
     setTeamRating(rating);
+
+    if (m === "gauntlet") {
+      const legs = simulateGauntlet(rating, strengths, simSeed);
+      setGauntletLegs(legs);
+      if (!isReplay) {
+        const cleared = legs.filter((l) => l.survived).length;
+        const fellAt = legs.findIndex((l) => !l.survived);
+        recordGame({
+          t: Date.now(), mode: m, wins: fellAt === -1 ? legs.length : fellAt,
+          losses: fellAt === -1 ? 0 : legs.length - fellAt, flag: cleared === legs.length,
+          perfect: false, rating: Math.round(rating * 10) / 10, eras: finalEras,
+        });
+      }
+      setPhase("result");
+      return;
+    }
+
+    const result = simulateSeason(rating, values, simSeed);
     setSim(result);
     setOppLabels(labels);
+    if (targetRating) {
+      setSeries(simulateSeries(rating, targetRating, values, simSeed));
+    }
     const payload = encodeShare({
       m, e: finalEras, s: simSeed,
       p: finalRoster
@@ -208,15 +248,16 @@ function PlayInner() {
     setShareUrl(`${window.location.origin}${BASE_PATH}/play/?mode=${m}&d=${payload}`);
     setChallengeUrl(
       `${window.location.origin}${BASE_PATH}/play/?mode=${m}&eras=${finalEras.join(",")}` +
-        `&seed=${seed}&target=${result.wins}-${result.losses}`,
+        `&seed=${seed}&target=${result.wins}-${result.losses}&trating=${rating.toFixed(1)}`,
     );
     if (!isReplay) {
-      recordGame({
+      const earned = recordGame({
         t: Date.now(), mode: m, wins: result.wins, losses: result.losses,
-        flag: result.finals.modal === "premiers", perfect: result.wins === 23,
+        flag: !isSpoon && result.finals.modal === "premiers", perfect: result.wins === 23,
         rating: Math.round(rating * 10) / 10, eras: finalEras,
         ...(isDaily ? { daily: todayMelbourne() } : {}),
       });
+      setNewBadges(earned);
     }
     setPhase("result");
   }
@@ -341,6 +382,11 @@ function PlayInner() {
       } else {
         sorted = [...base].sort((a, b) => (capSort === "asc" ? a.s - b.s : b.s - a.s));
       }
+    } else if (isSpoon) {
+      // wooden spoon: the worst footballers float to the top
+      const worth = (p: PlayerEntry) =>
+        posFilter ? p.r[posFilter] : Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD);
+      sorted = [...base].sort((a, b) => worth(a) - worth(b));
     } else if (posFilter) {
       sorted = [...base].sort((a, b) => b.r[posFilter] - a.r[posFilter]);
     } else {
@@ -371,6 +417,14 @@ function PlayInner() {
     );
   }
 
+  if (phase === "result" && gauntletLegs) {
+    return (
+      <main className="px-4 py-10">
+        <GauntletResult mode={mode} roster={roster} teamRating={teamRating} legs={gauntletLegs} />
+      </main>
+    );
+  }
+
   if (phase === "result" && sim) {
     return (
       <main className="px-4 py-10">
@@ -385,6 +439,9 @@ function PlayInner() {
           oppLabels={oppLabels}
           targetRecord={targetRecord}
           daily={isDaily}
+          spoon={isSpoon}
+          series={series}
+          newBadges={newBadges}
         />
       </main>
     );
@@ -597,9 +654,11 @@ function PlayInner() {
                     ? capSort === "afford"
                       ? `best ${posFilter ?? "players"} you can afford`
                       : `top 20 ${posFilter ? posFilter + "s" : ""} by salary`
-                    : posFilter
-                      ? `top 20 by ${posFilter} rating`
-                      : "top 20 rated"}
+                    : isSpoon
+                      ? "bottom 20 — the spoon beckons"
+                      : posFilter
+                        ? `top 20 by ${posFilter} rating`
+                        : "top 20 rated"}
               </p>
 
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -612,6 +671,7 @@ function PlayInner() {
                     disabled={isCap && !canAfford(p)}
                     ratingPos={posFilter}
                     onPick={() => (inSwap ? confirmLifelineSwap(p) : setPendingPlayer(p))}
+                    onInfo={() => setSheetPlayer(p)}
                   />
                 ))}
                 {visiblePool.length === 0 && <p className="text-sm text-slate-500">No matching players.</p>}
@@ -620,6 +680,8 @@ function PlayInner() {
           )}
         </div>
       </div>
+
+      {sheetPlayer && <PlayerSheet p={sheetPlayer} onClose={() => setSheetPlayer(null)} />}
 
       {/* slot assignment sheet */}
       {pendingPlayer && combo && !inSwap && (

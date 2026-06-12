@@ -28,10 +28,12 @@ export function readProfile(): Profile {
   }
 }
 
-export function recordGame(rec: GameRecord) {
+/** records the game; returns any badges earned by this result */
+export function recordGame(rec: GameRecord): Badge[] {
   const p = readProfile();
   // one recorded result per daily
-  if (rec.daily && p.games.some((g) => g.daily === rec.daily)) return;
+  if (rec.daily && p.games.some((g) => g.daily === rec.daily)) return [];
+  const before = new Set(badges(p).map((b) => b.label));
   p.games.push(rec);
   if (p.games.length > 200) p.games = p.games.slice(-200);
   try {
@@ -39,6 +41,7 @@ export function recordGame(rec: GameRecord) {
   } catch {
     /* storage full/blocked */
   }
+  return badges(p).filter((b) => !before.has(b.label));
 }
 
 /** Melbourne-time date string — footy runs on AEST */
@@ -82,7 +85,9 @@ export function badges(p: Profile): Badge[] {
   if (flags.some((x) => x.eras.length === 1)) out.push({ emoji: "⏳", label: "Single-era flag" });
   if (flags.some((x) => x.mode !== "classic5")) out.push({ emoji: "📋", label: "Deep-squad flag" });
   if (g.filter((x) => x.daily).length >= 3) out.push({ emoji: "📅", label: "Daily regular" });
-  if (g.some((x) => x.wins >= 21)) out.push({ emoji: "⚡", label: "21+ win season" });
+  if (g.some((x) => x.wins >= 21 && x.mode !== "gauntlet")) out.push({ emoji: "⚡", label: "21+ win season" });
+  if (g.some((x) => x.mode === "spoon" && x.wins === 0)) out.push({ emoji: "🥄", label: "Perfect Spoon — 0-23" });
+  if (g.some((x) => x.mode === "gauntlet" && x.flag)) out.push({ emoji: "🛡️", label: "Conquered all of history" });
   return out;
 }
 
