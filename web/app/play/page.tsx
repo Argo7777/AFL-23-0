@@ -3,11 +3,14 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { BASE_PATH, loadMeta, loadPool, loadStrengths, poolStrengths } from "@/lib/game/data";
+import {
+  BASE_PATH, loadMeta, loadPool, loadStrengths, loadTopRatings, poolStrengths,
+} from "@/lib/game/data";
 import { dailySeed, recordGame, todayMelbourne } from "@/lib/game/profile";
 import { mulberry32, randomSeed } from "@/lib/game/rng";
 import {
-  GauntletLeg, SeriesResult, simulateGauntlet, simulateSeason, simulateSeries, SimResult,
+  buildOpponents, GauntletLeg, SeriesResult, simulateGauntlet, simulateSeason, simulateSeries,
+  SimResult,
 } from "@/lib/game/sim";
 import {
   Meta, Mode, Pick, PlayerEntry, Slot, REROLLS, scoreInSlot,
@@ -233,7 +236,12 @@ function PlayInner() {
       return;
     }
 
-    const result = simulateSeason(rating, values, simSeed);
+    // every week you face a synthetic all-star side drawn from the selected
+    // eras' best — except the spoon chase, which plays real (beatable) clubs
+    const opponents = m === "spoon"
+      ? null
+      : buildOpponents(await loadTopRatings(), finalEras, filled.length, simSeed);
+    const result = simulateSeason(rating, values, simSeed, opponents, labels);
     setSim(result);
     setOppLabels(labels);
     if (targetRating) {
@@ -253,7 +261,8 @@ function PlayInner() {
     if (!isReplay) {
       const earned = recordGame({
         t: Date.now(), mode: m, wins: result.wins, losses: result.losses,
-        flag: !isSpoon && result.finals.modal === "premiers", perfect: result.wins === 23,
+        flag: false, // upgraded by flagLastGame() if they win the finals
+        perfect: result.wins === 23,
         rating: Math.round(rating * 10) / 10, eras: finalEras,
         ...(isDaily ? { daily: todayMelbourne() } : {}),
       });

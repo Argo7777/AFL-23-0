@@ -134,6 +134,17 @@ export function exportData() {
   }
   writeFileSync(join(OUT_DIR, "onthisday.json"), JSON.stringify(onThisDay));
 
+  // ---- top player ratings per decade (synthetic all-star opponents) ----
+  const topRatings: Record<string, number[]> = {};
+  for (const decade of decades) {
+    topRatings[decade] = players
+      .filter((p) => p.decade === decade)
+      .map((p) => p.best)
+      .sort((a, b) => b - a)
+      .slice(0, 100);
+  }
+  writeFileSync(join(OUT_DIR, "topratings.json"), JSON.stringify(topRatings));
+
   // ---- award winners by year (for the Who Won It game) ----
   const flipName = (n: string) => {
     const i = n.indexOf(",");

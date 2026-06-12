@@ -29,6 +29,16 @@ export async function loadStrengths(): Promise<Record<string, [number, string][]
   return strengthsCache!;
 }
 
+let topRatingsCache: Record<string, number[]> | null = null;
+
+/** top-100 player ratings per decade — fuel for synthetic all-star opponents */
+export async function loadTopRatings(): Promise<Record<string, number[]>> {
+  if (!topRatingsCache) {
+    topRatingsCache = await (await fetch(`${BASE_PATH}/data/topratings.json`)).json();
+  }
+  return topRatingsCache!;
+}
+
 /** pool the selected decades into aligned, ascending values + labels */
 export function poolStrengths(
   all: Record<string, [number, string][]>,

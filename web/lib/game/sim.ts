@@ -9,9 +9,43 @@ export type FinalsOutcome =
   | "premiers";
 
 export interface StoryGame {
-  round: string; // "R1".."R23", "Qualifying Final", "Grand Final"…
-  opp: number; // index into the sorted strengths array (label lookup)
+  round: string; // "R1".."R23"
+  oppLabel: string; // "1990s All-Stars (93.4)" or "1995 Carlton"
   win: boolean;
+}
+
+export interface OppTeam {
+  rating: number;
+  label: string;
+}
+
+/**
+ * Synthetic opposition: every week you face a random all-star side — K
+ * players drawn at random from a random selected decade's top-N. Your
+ * hand-picked legends play other hand-picked legends, not 1997's mortals.
+ */
+export function buildOpponents(
+  topRatings: Record<string, number[]>,
+  eras: number[],
+  squadSize: number, // 5 or 23
+  seed: number,
+  count = 400,
+): OppTeam[] {
+  const poolN = squadSize <= 5 ? 50 : 100;
+  const rand = mulberry32(seed ^ 0x0a11);
+  const out: OppTeam[] = [];
+  const usable = eras.filter((e) => (topRatings[String(e)] ?? []).length >= poolN / 2);
+  if (!usable.length) return out;
+  for (let i = 0; i < count; i++) {
+    const decade = usable[Math.floor(rand() * usable.length)];
+    const pool = topRatings[String(decade)];
+    const n = Math.min(poolN, pool.length);
+    let sum = 0;
+    for (let k = 0; k < squadSize; k++) sum += pool[Math.floor(rand() * n)];
+    const rating = sum / squadSize;
+    out.push({ rating, label: `${decade}s All-Stars (${rating.toFixed(1)})` });
+  }
+  return out;
 }
 
 export interface SimResult {
@@ -21,13 +55,7 @@ export interface SimResult {
   userStrength: number;
   realPercentile: number; // vs real club-seasons of the chosen eras
   distribution: number[]; // index = wins, value = % of seasons
-  finals: {
-    pct: Record<FinalsOutcome, number>;
-    modal: FinalsOutcome;
-    premiersPct: number;
-    madeFinalsPct: number;
-  };
-  /** one representative season matching the modal record & finals outcome */
+  /** one representative season matching the modal record */
   story: StoryGame[];
 }
 
@@ -146,120 +174,59 @@ export function simulateSeason(
   teamRating: number,
   strengths: number[], // sorted ascending, pooled real club-season strengths
   seed: number,
+  opponents: OppTeam[] | null = null, // synthetic all-star opposition
+  legacyLabels: string[] = [], // real club-season labels (spoon mode)
   runs = 10_000,
 ): SimResult {
   const n = strengths.length;
   const userStrength = ratingToStrength(teamRating, strengths);
-
   const realPercentile = (strengths.filter((s) => s < userStrength).length / n) * 100;
 
-  // finals cut-offs in win-share terms, from the real strength distribution
-  // (top ~44% of a season qualifies in a final-8 world; top ~22% hosts)
-  const qualifyShare = strengths[Math.floor(0.62 * (n - 1))];
-  const top4Share = strengths[Math.floor(0.82 * (n - 1))];
-  const sampleBand = (rand: () => number, lo: number, hi: number) =>
-    strengths[Math.floor((lo + rand() * (hi - lo)) * (n - 1))];
+  // precompute each opponent's win probability against us
+  let oppProbs: number[];
+  let oppLabelOf: (i: number) => string;
+  let drawIdx: (rand: () => number) => number;
+  if (opponents && opponents.length) {
+    oppProbs = opponents.map((o) => winProb(userStrength, ratingToStrength(o.rating, strengths)));
+    oppLabelOf = (i) => opponents[i].label;
+    drawIdx = (rand) => Math.floor(rand() * opponents.length);
+  } else {
+    // legacy schedule (wooden spoon): real club-seasons, skipping the
+    // bottom quartile and leaning toward quality
+    const idxFor = (rand: () => number) => Math.floor((0.25 + 0.75 * rand() ** 0.7) * (n - 1));
+    oppProbs = strengths.map((s) => winProb(userStrength, s));
+    oppLabelOf = (i) => legacyLabels[i] ?? "a real club of the era";
+    drawIdx = idxFor;
+  }
 
   const rand = mulberry32(seed);
   const winCounts = new Array(24).fill(0);
-  const outcomes: Record<FinalsOutcome, number> = {
-    missed: 0, elim: 0, semi: 0, prelim: 0, runnerUp: 0, premiers: 0,
-  };
-
-  // schedule strength: no fixture is 23 games against wooden-spooners — the
-  // draw skips the bottom quartile of real teams and leans toward quality
-  const drawOpponent = (rand: () => number) =>
-    strengths[Math.floor((0.25 + 0.75 * rand() ** 0.7) * (n - 1))];
-
   for (let r = 0; r < runs; r++) {
     let wins = 0;
     for (let g = 0; g < 23; g++) {
-      const opp = drawOpponent(rand);
-      if (rand() < winProb(userStrength, opp)) wins++;
+      if (rand() < oppProbs[drawIdx(rand)]) wins++;
     }
     winCounts[wins]++;
-
-    // ---- September ----
-    const winShare = wins / 23;
-    if (winShare < qualifyShare) {
-      outcomes.missed++;
-      continue;
-    }
-    const beat = (lo: number, hi: number) => rand() < winProb(userStrength, sampleBand(rand, lo, hi));
-    let outcome: FinalsOutcome;
-    if (winShare >= top4Share) {
-      // top four: qualifying final, a second chance, then prelim and GF
-      if (beat(0.85, 1)) {
-        outcome = beat(0.85, 1) ? (beat(0.9, 1) ? "premiers" : "runnerUp") : "prelim";
-      } else if (beat(0.7, 0.95)) {
-        outcome = beat(0.85, 1) ? (beat(0.9, 1) ? "premiers" : "runnerUp") : "prelim";
-      } else {
-        outcome = "semi";
-      }
-    } else {
-      // elimination path: win four straight or go home
-      if (!beat(0.62, 0.9)) outcome = "elim";
-      else if (!beat(0.7, 0.95)) outcome = "semi";
-      else if (!beat(0.85, 1)) outcome = "prelim";
-      else outcome = beat(0.9, 1) ? "premiers" : "runnerUp";
-    }
-    outcomes[outcome]++;
   }
 
   let modalWins = 0;
   for (let w = 0; w < winCounts.length; w++) {
     if (winCounts[w] >= winCounts[modalWins]) modalWins = w;
   }
-  const finalsPct = Object.fromEntries(
-    Object.entries(outcomes).map(([k, v]) => [k, (v / runs) * 100]),
-  ) as Record<FinalsOutcome, number>;
-  const modalFinals = (Object.keys(outcomes) as FinalsOutcome[]).reduce((a, b) =>
-    outcomes[a] >= outcomes[b] ? a : b,
-  );
 
-  // ---- the story: replay seasons until one matches the modal outcome ----
+  // ---- the story: replay seasons until one matches the modal record ----
   const storyRand = mulberry32(seed ^ 0x5eed);
   let story: StoryGame[] = [];
   for (let attempt = 0; attempt < 4000; attempt++) {
     const games: StoryGame[] = [];
     let wins = 0;
     for (let g = 0; g < 23; g++) {
-      const oppIdx = Math.floor((0.25 + 0.75 * storyRand() ** 0.7) * (n - 1));
-      const win = storyRand() < winProb(userStrength, strengths[oppIdx]);
+      const i = drawIdx(storyRand);
+      const win = storyRand() < oppProbs[i];
       if (win) wins++;
-      games.push({ round: `R${g + 1}`, opp: oppIdx, win });
+      games.push({ round: `R${g + 1}`, oppLabel: oppLabelOf(i), win });
     }
-    if (wins !== modalWins) continue;
-
-    const winShare = wins / 23;
-    let outcome: FinalsOutcome = "missed";
-    if (winShare >= qualifyShare) {
-      const final = (round: string, lo: number, hi: number): boolean => {
-        const oppIdx = Math.floor((lo + storyRand() * (hi - lo)) * (n - 1));
-        const win = storyRand() < winProb(userStrength, strengths[oppIdx]);
-        games.push({ round, opp: oppIdx, win });
-        return win;
-      };
-      if (winShare >= top4Share) {
-        if (final("Qualifying Final", 0.85, 1)) {
-          outcome = final("Preliminary Final", 0.85, 1)
-            ? final("Grand Final", 0.9, 1) ? "premiers" : "runnerUp"
-            : "prelim";
-        } else if (final("Semi Final", 0.7, 0.95)) {
-          outcome = final("Preliminary Final", 0.85, 1)
-            ? final("Grand Final", 0.9, 1) ? "premiers" : "runnerUp"
-            : "prelim";
-        } else {
-          outcome = "semi";
-        }
-      } else {
-        if (!final("Elimination Final", 0.62, 0.9)) outcome = "elim";
-        else if (!final("Semi Final", 0.7, 0.95)) outcome = "semi";
-        else if (!final("Preliminary Final", 0.85, 1)) outcome = "prelim";
-        else outcome = final("Grand Final", 0.9, 1) ? "premiers" : "runnerUp";
-      }
-    }
-    if (outcome === modalFinals) {
+    if (wins === modalWins) {
       story = games;
       break;
     }
@@ -272,12 +239,6 @@ export function simulateSeason(
     userStrength,
     realPercentile,
     distribution: winCounts.map((c) => (c / runs) * 100),
-    finals: {
-      pct: finalsPct,
-      modal: modalFinals,
-      premiersPct: finalsPct.premiers,
-      madeFinalsPct: 100 - finalsPct.missed,
-    },
     story,
   };
 }

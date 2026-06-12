@@ -317,13 +317,13 @@ export default function ResultView({
             </div>
           </div>
 
-          {sim.story.length > 0 && oppLabels.length > 0 && (
+          {sim.story.length > 0 && (
             <details className="mt-4 rounded-2xl border border-line bg-pitch-light p-4">
               <summary className="cursor-pointer text-[11px] uppercase tracking-widest text-slate-500">
                 Season story — round by round
               </summary>
               <div className="mt-3 grid gap-1 sm:grid-cols-2">
-                {sim.story.filter((g) => g.round.startsWith("R")).map((g, i) => {
+                {sim.story.map((g, i) => {
                   const finalGame = false;
                   return (
                     <div
@@ -336,7 +336,7 @@ export default function ResultView({
                         {g.round}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-slate-300">
-                        vs {oppLabels[g.opp] ?? "?"}
+                        vs {g.oppLabel}
                       </span>
                       <span className={`ml-2 font-display font-black ${g.win ? "text-grass" : "text-hot"}`}>
                         {g.win ? "W" : "L"}
