@@ -165,6 +165,36 @@ export default function Home() {
         </div>
       </section>
 
+      {/* more games */}
+      <section className="mt-8 grid gap-4 sm:grid-cols-2">
+        <Link
+          href="/legend"
+          className="rounded-2xl border border-line bg-pitch-light p-5 transition hover:border-ice/50 hover:bg-card"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            daily mystery · 6 guesses
+          </div>
+          <div className="font-display mt-1 text-2xl font-black">
+            Guess the Legend <span className="text-ice">#{dailyNumber()}</span>
+          </div>
+          <p className="mt-2 text-sm text-slate-400">
+            One mystery great per day. Every miss unlocks a clue — era, stats, honours, clubs.
+          </p>
+        </Link>
+        <Link
+          href="/higher"
+          className="rounded-2xl border border-line bg-pitch-light p-5 transition hover:border-ice/50 hover:bg-card"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            endless streak
+          </div>
+          <div className="font-display mt-1 text-2xl font-black">Higher or Lower</div>
+          <p className="mt-2 text-sm text-slate-400">
+            Two players, one stat — who averaged more? Real numbers, brutal streaks.
+          </p>
+        </Link>
+      </section>
+
       {/* coach's record */}
       {prof?.s && (
         <section className="mt-8 rounded-2xl border border-line bg-pitch-light p-5">
