@@ -84,7 +84,8 @@ export default {
         ? JSON.parse((await env.BOARD.get(`d:${d}`)) ?? "[]")
         : [];
       const club = JSON.parse((await env.BOARD.get("club230")) ?? "[]");
-      return new Response(JSON.stringify({ daily, club }), {
+      // `alltime` kept for clients still running the previous page bundle
+      return new Response(JSON.stringify({ daily, club, alltime: club }), {
         headers: { ...headers, "Cache-Control": "public, max-age=30" },
       });
     }
