@@ -31,7 +31,7 @@ const MODES: { id: Mode; name: string; tag: string; desc: string }[] = [
     id: "gauntlet",
     name: "The Gauntlet",
     tag: "survival",
-    desc: "Pick five, then survive every decade of history in order — 12+ wins in each era or the run ends.",
+    desc: "Pick five, then beat every decade's champion team in a best-of-three — 1890s to now. Lose a series, lose the run.",
   },
   {
     id: "spoon",

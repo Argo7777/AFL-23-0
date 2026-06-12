@@ -91,12 +91,19 @@ export function simulateSeries(
   return { games, myWins: my, theirWins: their, won: my === 3 };
 }
 
-/** the Gauntlet: survive every decade of history in sequence */
+/**
+ * the Gauntlet: a best-of-3 series against each decade's BEST real team,
+ * oldest era first — win the series to advance, survive all 14 to conquer
+ * history
+ */
 export interface GauntletLeg {
   decade: number;
+  oppLabel: string; // "1995 Carlton"
+  oppStrength: number;
+  games: boolean[]; // series games from the player's perspective
   wins: number;
   losses: number;
-  survived: boolean; // 12+ wins to advance
+  survived: boolean;
 }
 
 export function simulateGauntlet(
@@ -107,23 +114,22 @@ export function simulateGauntlet(
   const legs: GauntletLeg[] = [];
   const decades = Object.keys(strengthsByDecade).map(Number).sort((a, b) => a - b);
   for (const d of decades) {
-    const values = strengthsByDecade[String(d)].map((p) => p[0]).sort((a, b) => a - b);
-    if (values.length < 8) continue;
+    const pairs = strengthsByDecade[String(d)];
+    if (!pairs || pairs.length < 8) continue;
+    const values = pairs.map((p) => p[0]); // already sorted ascending
+    const [oppStrength, oppLabel] = pairs[pairs.length - 1]; // the decade's champion
     const s = ratingToStrength(teamRating, values);
-    const n = values.length;
+    const p = winProb(s, oppStrength);
     const rand = mulberry32((seed ^ d) >>> 0);
-    const wc = new Array(24).fill(0);
-    for (let r = 0; r < 2000; r++) {
-      let w = 0;
-      for (let g = 0; g < 23; g++) {
-        const opp = values[Math.floor((0.25 + 0.75 * rand() ** 0.7) * (n - 1))];
-        if (rand() < winProb(s, opp)) w++;
-      }
-      wc[w]++;
+    const games: boolean[] = [];
+    let w = 0, l = 0;
+    while (w < 2 && l < 2) {
+      const win = rand() < p;
+      games.push(win);
+      if (win) w++;
+      else l++;
     }
-    let modal = 0;
-    for (let w = 0; w < 24; w++) if (wc[w] >= wc[modal]) modal = w;
-    legs.push({ decade: d, wins: modal, losses: 23 - modal, survived: modal >= 12 });
+    legs.push({ decade: d, oppLabel, oppStrength, games, wins: w, losses: l, survived: w === 2 });
   }
   return legs;
 }
