@@ -103,7 +103,7 @@ export async function buildShareCard(
     const spread: Record<string, number> = { FWD: 15, MID: 39, RUC: 63, DEF: 87 };
     field = field.map((s) => ({ ...s, y: spread[s.slot] ?? s.y }));
   }
-  const chipR = big ? 44 : 30;
+  const chipR = big ? 44 : 32;
   const nameFont = big ? 26 : 19;
   const scoreFont = big ? 34 : 24;
 

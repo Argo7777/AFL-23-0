@@ -72,6 +72,14 @@ export default function PlayerSheet({
         <p className="mt-2 text-[10px] text-slate-600">
           This decade only — players appear separately in each decade they played.
         </p>
+        {Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD) >= 75 && (
+          <a
+            href={`/player/${(p.id.split("|")[0].split("/").pop() ?? "").replace(/\.html$/, "").toLowerCase().replace(/_/g, "-").replace(/[^a-z0-9-]/g, "")}/`}
+            className="mt-2 inline-block text-xs text-ice underline"
+          >
+            full career profile →
+          </a>
+        )}
       </div>
     </div>
   );

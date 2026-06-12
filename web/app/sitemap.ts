@@ -14,6 +14,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/awarded/`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${base}/tips/`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${base}/ladder/`, changeFrequency: "daily", priority: 0.6 },
+    { url: `${base}/duel/`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/rebuild/`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/dynasty/`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/about/`, changeFrequency: "monthly", priority: 0.5 },
   ];
 }

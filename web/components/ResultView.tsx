@@ -13,6 +13,27 @@ import FinalsCampaign from "@/components/FinalsCampaign";
 import Confetti from "@/components/Confetti";
 import TeamField from "@/components/TeamField";
 
+/** median decade of the squad drives a film-stock tint on the oval */
+function medianDecade(picks: Pick[]): number {
+  if (!picks.length) return 2020;
+  const ds = picks.map((p) => p.decade).sort((a, b) => a - b);
+  return ds[Math.floor(ds.length / 2)];
+}
+function eraFilter(picks: Pick[]): string {
+  const d = medianDecade(picks);
+  if (d < 1950) return "sepia(0.45) contrast(0.95) brightness(1.02)";
+  if (d < 1980) return "sepia(0.2) saturate(0.85)";
+  if (d < 2000) return "saturate(1.15) contrast(1.03)";
+  return "none";
+}
+function eraLabel(picks: Pick[]): string | null {
+  const d = medianDecade(picks);
+  if (d < 1950) return "old boots era";
+  if (d < 1980) return "black & white TV era";
+  if (d < 2000) return "VHS era";
+  return null;
+}
+
 /** count from 0 to the final record — the dopamine moment */
 function useCountUp(target: number, ms = 1100): number {
   const [v, setV] = useState(0);
@@ -48,6 +69,7 @@ export default function ResultView({
   replay,
   opponents,
   cultCount,
+  draftPct,
 }: {
   mode: Mode;
   roster: (Pick | null)[];
@@ -66,12 +88,14 @@ export default function ResultView({
   replay?: boolean;
   opponents?: OppTeam[];
   cultCount?: number;
+  draftPct?: number | null;
 }) {
   const [copied, setCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [ladderName, setLadderName] = useState("");
   const [ladderState, setLadderState] = useState<"idle" | "sending" | "done" | "failed">("idle");
+  const [postedFin, setPostedFin] = useState<string | null>(null); // fin at last post
   const [flagWon, setFlagWon] = useState(false);
   const [finResult, setFinResult] = useState(""); // QF/SF/PF/GF exit or P
   const [oppView, setOppView] = useState<OppTeam | null>(null);
@@ -89,6 +113,7 @@ export default function ResultView({
       ...(daily ? { daily: todayMelbourne() } : {}),
     });
     setLadderState(ok ? "done" : "failed");
+    if (ok) setPostedFin(finResult);
   }
   const picks = roster.filter((p): p is Pick => p !== null);
   const perfect = spoon ? sim.wins === 0 : sim.wins === 23;
@@ -265,10 +290,21 @@ export default function ResultView({
               </span>
             )}
           </span>
-          <span>
-            Better than <b className="text-slate-100">{sim.realPercentile.toFixed(1)}%</b> of real{" "}
-            {eras.length > 4 ? "all-era" : eras.map((e) => `${e}s`).join("/")} teams
-          </span>
+          {draftPct != null ? (
+            <span>
+              {spoon ? "Tanked to" : "Drafted"}{" "}
+              <b className={draftPct >= 99.5 ? "text-grass" : "text-slate-100"}>
+                {draftPct.toFixed(1)}%
+              </b>{" "}
+              of your spins&apos; {spoon ? "floor" : "ceiling"}
+              {draftPct >= 99.5 ? " — flawless" : ""}
+            </span>
+          ) : (
+            <span>
+              Better than <b className="text-slate-100">{sim.realPercentile.toFixed(1)}%</b> of real{" "}
+              {eras.length > 4 ? "all-era" : eras.map((e) => `${e}s`).join("/")} teams
+            </span>
+          )}
           {spoon ? (
             <span>
               Goes 0-23 in <b className="text-slate-100">{sim.distribution[0].toFixed(1)}%</b> of seasons
@@ -304,7 +340,15 @@ export default function ResultView({
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(280px,380px)_1fr]">
-        <TeamField mode={mode} roster={roster} selected={null} movable={false} onSelect={() => {}} />
+        {/* era-tinted field: the older the squad, the older the film stock */}
+        <div style={{ filter: eraFilter(picks) }} className="relative">
+          <TeamField mode={mode} roster={roster} selected={null} movable={false} onSelect={() => {}} />
+          {eraLabel(picks) && (
+            <span className="absolute right-2 top-2 rounded bg-pitch/70 px-2 py-0.5 text-[10px] uppercase tracking-widest text-slate-400">
+              {eraLabel(picks)}
+            </span>
+          )}
+        </div>
 
         <div>
           <div className="rounded-2xl border border-line bg-pitch-light p-4">
@@ -390,9 +434,21 @@ export default function ResultView({
       {LEADERBOARD_URL && mode !== "gauntlet" && !spoon && (
         <div className="mx-auto mt-8 flex max-w-md items-center gap-2 rounded-2xl border border-line bg-pitch-light p-3">
           {ladderState === "done" ? (
-            <p className="w-full text-center text-sm text-grass">
-              On the board! <Link href="/ladder" className="underline">See the global ladder →</Link>
-            </p>
+            postedFin !== finResult ? (
+              <div className="flex w-full items-center justify-center gap-3 text-sm">
+                <span className="text-slate-300">September played —</span>
+                <button
+                  onClick={postToLadder}
+                  className="rounded-xl bg-gold px-4 py-1.5 font-display text-sm font-black text-pitch"
+                >
+                  UPDATE LADDER WITH {finResult === "P" ? "🏆" : `${finResult} RESULT`}
+                </button>
+              </div>
+            ) : (
+              <p className="w-full text-center text-sm text-grass">
+                On the board! <Link href="/ladder" className="underline">See the global ladder →</Link>
+              </p>
+            )
           ) : (
             <>
               <input

@@ -76,6 +76,30 @@ export interface Pick {
   club: string;
   slot: Slot;
   score: number; // rating in the assigned slot (incl. UTL multiplier)
+  /** best & worst achievable score per slot from this spin's pool, captured
+   *  at pick time — powers the "vs your spins' ceiling" verdict */
+  pb?: Record<Slot, number>;
+  pw?: Record<Slot, number>;
+}
+
+/** per-slot best/worst achievable from a pool (excluding taken players) */
+export function poolExtremes(
+  pool: PlayerEntry[],
+  usedKeys: Set<string>,
+): { pb: Record<Slot, number>; pw: Record<Slot, number> } {
+  const slots: Slot[] = ["DEF", "MID", "RUC", "FWD", "UTL"];
+  const pb = { DEF: 0, MID: 0, RUC: 0, FWD: 0, UTL: 0 } as Record<Slot, number>;
+  const pw = { DEF: 999, MID: 999, RUC: 999, FWD: 999, UTL: 999 } as Record<Slot, number>;
+  for (const p of pool) {
+    if (usedKeys.has(p.id.split("|")[0])) continue;
+    for (const s of slots) {
+      const v = scoreInSlot(p, s);
+      if (v > pb[s]) pb[s] = v;
+      if (v < pw[s]) pw[s] = v;
+    }
+  }
+  for (const s of slots) if (pw[s] === 999) pw[s] = 0;
+  return { pb, pw };
 }
 
 /** Score a player in a slot: off-position uses that position's cohort rating;

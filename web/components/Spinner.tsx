@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { clubColors } from "@/lib/game/clubColors";
 
+import { soundOn } from "@/lib/game/sound";
+
 // pokie-style ticks via WebAudio; silently no-ops where audio is blocked
 let audioCtx: AudioContext | null = null;
 function blip(freq: number, durMs: number, gainV = 0.04) {
+  if (!soundOn()) return;
   try {
     audioCtx ??= new AudioContext();
     if (audioCtx.state === "suspended") audioCtx.resume();

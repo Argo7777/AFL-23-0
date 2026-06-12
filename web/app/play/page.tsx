@@ -13,10 +13,11 @@ import {
   SimResult,
 } from "@/lib/game/sim";
 import {
-  Meta, Mode, Pick, PlayerEntry, Slot, REROLLS, scoreInSlot,
+  Meta, Mode, Pick, PlayerEntry, poolExtremes, Slot, REROLLS, scoreInSlot,
 } from "@/lib/game/types";
 import { clubColors } from "@/lib/game/clubColors";
 import { CULT_BOOST, cultNickname } from "@/lib/game/cultHeroes";
+import { soundOn, toggleSound } from "@/lib/game/sound";
 import { OppTeam } from "@/lib/game/sim";
 import Spinner from "@/components/Spinner";
 import PlayerCard, { fmtSalary, honours } from "@/components/PlayerCard";
@@ -90,6 +91,7 @@ function PlayInner() {
   const [swapIndex, setSwapIndex] = useState<number | null>(null);
   const [swapPool, setSwapPool] = useState<PlayerEntry[]>([]);
   const [sim, setSim] = useState<SimResult | null>(null);
+  const [draftPct, setDraftPct] = useState<number | null>(null); // vs the spins' ceiling
   const [gauntletLegs, setGauntletLegs] = useState<GauntletLeg[] | null>(null);
   const [series, setSeries] = useState<SeriesResult | null>(null);
   const [newBadges, setNewBadges] = useState<{ emoji: string; label: string }[]>([]);
@@ -99,7 +101,10 @@ function PlayInner() {
   const [oppLabels, setOppLabels] = useState<string[]>([]);
   const [opponents, setOpponents] = useState<OppTeam[]>([]);
   const [cultToast, setCultToast] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setSoundEnabled(soundOn()), []);
   const [showField, setShowField] = useState(false); // mobile: field behind a toggle
 
   const picks = useMemo(() => roster.filter((p): p is Pick => p !== null), [roster]);
@@ -181,6 +186,7 @@ function PlayInner() {
                 rebuilt[pk.i] = {
                   player, decade: pk.d, club: pk.c, slot: instances[pk.i].slot,
                   score: scoreInSlot(player, instances[pk.i].slot),
+                  ...poolExtremes(players, new Set()),
                 };
               }
             }
@@ -241,6 +247,20 @@ function PlayInner() {
     );
     setTeamRating(rating);
 
+    // how close was this draft to the best (or, for the spoon, the worst)
+    // possible selections from the exact spins they were given?
+    const withExtremes = filled.filter((p) => p.pb && p.pw);
+    if (withExtremes.length === filled.length && filled.length > 0) {
+      const got = filled.reduce((a, p) => a + p.score, 0);
+      if (m === "spoon") {
+        const floor = filled.reduce((a, p) => a + (p.pw![p.slot] || p.score), 0);
+        setDraftPct(got > 0 ? Math.min(100, (floor / got) * 100) : 100);
+      } else {
+        const ceiling = filled.reduce((a, p) => a + (p.pb![p.slot] || p.score), 0);
+        setDraftPct(ceiling > 0 ? Math.min(100, (got / ceiling) * 100) : 100);
+      }
+    }
+
     if (m === "gauntlet") {
       const legs = simulateGauntlet(rating, strengths, simSeed);
       setGauntletLegs(legs);
@@ -299,9 +319,10 @@ function PlayInner() {
     if (idx === -1) return;
     setUndoSnap({ roster, combo, pool }); // one step back, until the next pick
     const next = [...roster];
+    const extremes = poolExtremes(pool, usedPlayerKeys);
     next[idx] = {
       player, decade: combo.decade, club: combo.club, slot: slotType,
-      score: scoreInSlot(player, slotType),
+      score: scoreInSlot(player, slotType), ...extremes,
     };
     setRoster(next);
     setPendingPlayer(null);
@@ -331,6 +352,7 @@ function PlayInner() {
     next[swapIndex] = {
       player, decade: old.decade, club: old.club, slot: instances[swapIndex].slot,
       score: scoreInSlot(player, instances[swapIndex].slot),
+      ...poolExtremes(swapPool, usedPlayerKeys),
     };
     setRoster(next);
     setLifelines((l) => l - 1);
@@ -479,6 +501,7 @@ function PlayInner() {
           replay={!!shared}
           opponents={opponents}
           cultCount={cultCount}
+          draftPct={draftPct}
         />
       </main>
     );
@@ -492,6 +515,13 @@ function PlayInner() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
         <div className="flex items-center gap-4 text-xs text-slate-400">
+          <button
+            onClick={() => setSoundEnabled(toggleSound())}
+            aria-label="toggle sound"
+            className="rounded-lg border border-line px-2 py-1 text-sm hover:border-grass/50"
+          >
+            {soundEnabled ? "🔊" : "🔇"}
+          </button>
           {undoSnap && phase !== "result" && !inSwap && (
             <button
               onClick={undoLastPick}

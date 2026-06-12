@@ -395,12 +395,51 @@ export default function Home() {
             Every decade&apos;s top 25, by position and club. Settle the pub argument.
           </p>
         </Link>
+        <Link
+          href="/dynasty"
+          className="lift rounded-2xl border border-line bg-pitch-light p-5 hover:border-ice/50 hover:bg-card"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            coach an era
+          </div>
+          <div className="font-display mt-1 text-2xl font-black">Dynasty</div>
+          <p className="mt-2 text-sm text-slate-400">
+            Your legends age, decline and retire. How many flags before the era ends?
+          </p>
+        </Link>
+        <Link
+          href="/duel"
+          className="lift rounded-2xl border border-line bg-pitch-light p-5 hover:border-ice/50 hover:bg-card"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            pass and play
+          </div>
+          <div className="font-display mt-1 text-2xl font-black">Draft Duel</div>
+          <p className="mt-2 text-sm text-slate-400">
+            Two coaches, one phone, alternating spins — settle it with a best-of-5.
+          </p>
+        </Link>
+        <Link
+          href="/rebuild"
+          className="lift rounded-2xl border border-line bg-pitch-light p-5 hover:border-ice/50 hover:bg-card"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            one trade per season
+          </div>
+          <div className="font-display mt-1 text-2xl font-black">The Rebuild</div>
+          <p className="mt-2 text-sm text-slate-400">
+            Inherit a shocker and climb from basket case to premiers. Speedrun it.
+          </p>
+        </Link>
       </section>
 
       {/* coach's record */}
       {prof?.s && (
         <section className="mt-8 rounded-2xl border border-line bg-pitch-light p-5">
-          <h2 className="font-display text-xl font-black">Your coaching record</h2>
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-display text-xl font-black">Your coaching record</h2>
+            <Link href="/me" className="text-xs text-ice hover:underline">full career →</Link>
+          </div>
           <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm text-slate-300">
             <span>Seasons <b className="font-display text-lg text-slate-100">{prof.s.played}</b></span>
             <span>Premierships <b className="font-display text-lg text-gold">{prof.s.flags}</b></span>
