@@ -16,6 +16,8 @@ import {
   Meta, Mode, Pick, PlayerEntry, Slot, REROLLS, scoreInSlot,
 } from "@/lib/game/types";
 import { clubColors } from "@/lib/game/clubColors";
+import { CULT_BOOST, cultNickname } from "@/lib/game/cultHeroes";
+import { OppTeam } from "@/lib/game/sim";
 import Spinner from "@/components/Spinner";
 import PlayerCard, { fmtSalary, honours } from "@/components/PlayerCard";
 import GauntletResult from "@/components/GauntletResult";
@@ -95,11 +97,25 @@ function PlayInner() {
   const [shareUrl, setShareUrl] = useState("");
   const [challengeUrl, setChallengeUrl] = useState("");
   const [oppLabels, setOppLabels] = useState<string[]>([]);
+  const [opponents, setOpponents] = useState<OppTeam[]>([]);
+  const [cultToast, setCultToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showField, setShowField] = useState(false); // mobile: field behind a toggle
 
   const picks = useMemo(() => roster.filter((p): p is Pick => p !== null), [roster]);
   const pickCount = picks.length;
+  const cultCount = useMemo(
+    () => picks.filter((p) => cultNickname(p.player.n)).length,
+    [picks],
+  );
+
+  function celebrateCult(player: PlayerEntry) {
+    const nick = cultNickname(player.n);
+    if (!nick) return;
+    setCultToast(nick);
+    try { navigator.vibrate?.([40, 60, 40]); } catch { /* no haptics */ }
+    setTimeout(() => setCultToast(null), 2600);
+  }
 
   const cap = useMemo(() => {
     if (!meta || !isCap || eras.length === 0) return 0;
@@ -217,7 +233,12 @@ function PlayInner() {
     const filled = finalRoster.filter((p): p is Pick => p !== null);
     const strengths = await loadStrengths();
     const { values, labels } = poolStrengths(strengths, finalEras);
-    const rating = filled.reduce((a, p) => a + p.score, 0) / filled.length;
+    // cult heroes lift the whole side beyond what their stats ever showed
+    const cultBonus = CULT_BOOST * filled.filter((p) => cultNickname(p.player.n)).length;
+    const rating = Math.min(
+      100,
+      filled.reduce((a, p) => a + p.score, 0) / filled.length + cultBonus,
+    );
     setTeamRating(rating);
 
     if (m === "gauntlet") {
@@ -238,12 +259,13 @@ function PlayInner() {
 
     // every week you face a synthetic all-star side drawn from the selected
     // eras' best — except the spoon chase, which plays real (beatable) clubs
-    const opponents = m === "spoon"
+    const opps = m === "spoon"
       ? null
       : buildOpponents(await loadTopRatings(), finalEras, filled.length, simSeed);
-    const result = simulateSeason(rating, values, simSeed, opponents, labels);
+    const result = simulateSeason(rating, values, simSeed, opps, labels);
     setSim(result);
     setOppLabels(labels);
+    setOpponents(opps ?? []);
     if (targetRating) {
       setSeries(simulateSeries(rating, targetRating, values, simSeed));
     }
@@ -283,6 +305,7 @@ function PlayInner() {
     };
     setRoster(next);
     setPendingPlayer(null);
+    celebrateCult(player);
     if (next.every(Boolean)) setPhase("review");
     else rollCombo();
   }
@@ -315,6 +338,7 @@ function PlayInner() {
     setSwapPool([]);
     setPendingPlayer(null);
     setFieldSel(null);
+    celebrateCult(player);
   }
 
   /** field interaction: select, then swap/move; recomputes role scores */
@@ -453,6 +477,8 @@ function PlayInner() {
           series={series}
           newBadges={newBadges}
           replay={!!shared}
+          opponents={opponents}
+          cultCount={cultCount}
         />
       </main>
     );
@@ -464,7 +490,7 @@ function PlayInner() {
     <main className="mx-auto max-w-6xl px-4 py-6">
       {/* header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
+        <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
         <div className="flex items-center gap-4 text-xs text-slate-400">
           {undoSnap && phase !== "result" && !inSwap && (
             <button
@@ -693,6 +719,19 @@ function PlayInner() {
       </div>
 
       {sheetPlayer && <PlayerSheet p={sheetPlayer} onClose={() => setSheetPlayer(null)} />}
+
+      {/* cult hero celebration */}
+      {cultToast && (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+          <div className="pop rounded-3xl border-2 border-gold bg-pitch/95 px-10 py-8 text-center shadow-[0_0_80px_-10px] shadow-gold">
+            <div className="text-5xl">🔥</div>
+            <div className="font-display mt-1 text-4xl font-black text-gold">{cultToast}</div>
+            <div className="mt-2 text-sm font-bold uppercase tracking-widest text-slate-300">
+              cult hero — the whole team lifts (+{CULT_BOOST} rating)
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* slot assignment sheet */}
       {pendingPlayer && combo && !inSwap && (

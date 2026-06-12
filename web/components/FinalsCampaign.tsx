@@ -16,6 +16,8 @@ interface LogRow {
   injuries: string[];
 }
 
+const STAGE_ABBREV = ["QF", "SF", "PF", "GF"];
+
 export default function FinalsCampaign({
   mode,
   eras,
@@ -23,6 +25,7 @@ export default function FinalsCampaign({
   initialRoster,
   oppLabels,
   onFlag,
+  onResult,
 }: {
   mode: Mode;
   eras: number[];
@@ -30,6 +33,7 @@ export default function FinalsCampaign({
   initialRoster: (Pick | null)[];
   oppLabels: string[];
   onFlag: () => void;
+  onResult?: (fin: string) => void; // "QF"|"SF"|"PF"|"GF" exit, or "P"
 }) {
   const instances = useMemo(() => slotInstances(mode), [mode]);
   const injuriesOn = mode === "full23" || mode === "cap23";
@@ -79,10 +83,12 @@ export default function FinalsCampaign({
     setLog((l) => [...l, { stage: FINALS_STAGES[stage], opp, win, injuries: injuredNames }]);
     if (!win) {
       setStatus("out");
+      onResult?.(STAGE_ABBREV[stage]);
       return;
     }
     if (stage === FINALS_STAGES.length - 1) {
       setStatus("champions");
+      onResult?.("P");
       onFlag();
       return;
     }

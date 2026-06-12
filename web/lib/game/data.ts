@@ -29,10 +29,11 @@ export async function loadStrengths(): Promise<Record<string, [number, string][]
   return strengthsCache!;
 }
 
-let topRatingsCache: Record<string, number[]> | null = null;
+export type TopPlayer = [string, number, string]; // [name, rating, club]
+let topRatingsCache: Record<string, TopPlayer[]> | null = null;
 
-/** top-100 player ratings per decade — fuel for synthetic all-star opponents */
-export async function loadTopRatings(): Promise<Record<string, number[]>> {
+/** top-100 players per decade — fuel for synthetic all-star opponents */
+export async function loadTopRatings(): Promise<Record<string, TopPlayer[]>> {
   if (!topRatingsCache) {
     topRatingsCache = await (await fetch(`${BASE_PATH}/data/topratings.json`)).json();
   }

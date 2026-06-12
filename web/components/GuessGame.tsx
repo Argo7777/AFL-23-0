@@ -123,7 +123,7 @@ export default function GuessGame({ cfg }: { cfg: GuessConfig }) {
   return (
     <main className="mx-auto max-w-xl px-4 py-8">
       {state.done && state.won && <Confetti />}
-      <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
+      <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
       <h1 className="font-display mt-4 text-3xl font-black">
         {cfg.title} <span className={cfg.accent}>#{dailyNumber()}</span>
       </h1>

@@ -11,12 +11,16 @@ export type FinalsOutcome =
 export interface StoryGame {
   round: string; // "R1".."R23"
   oppLabel: string; // "1990s All-Stars (93.4)" or "1995 Carlton"
+  oppIdx: number | null; // into the opponents array (null in legacy mode)
   win: boolean;
 }
+
+export type TopPlayer = [string, number, string]; // [name, rating, club]
 
 export interface OppTeam {
   rating: number;
   label: string;
+  players: TopPlayer[]; // the actual drawn line-up
 }
 
 /**
@@ -25,7 +29,7 @@ export interface OppTeam {
  * hand-picked legends play other hand-picked legends, not 1997's mortals.
  */
 export function buildOpponents(
-  topRatings: Record<string, number[]>,
+  topRatings: Record<string, TopPlayer[]>,
   eras: number[],
   squadSize: number, // 5 or 23
   seed: number,
@@ -40,10 +44,17 @@ export function buildOpponents(
     const decade = usable[Math.floor(rand() * usable.length)];
     const pool = topRatings[String(decade)];
     const n = Math.min(poolN, pool.length);
-    let sum = 0;
-    for (let k = 0; k < squadSize; k++) sum += pool[Math.floor(rand() * n)];
-    const rating = sum / squadSize;
-    out.push({ rating, label: `${decade}s All-Stars (${rating.toFixed(1)})` });
+    const players: TopPlayer[] = [];
+    const taken = new Set<number>();
+    while (players.length < Math.min(squadSize, n)) {
+      const idx = Math.floor(rand() * n);
+      if (taken.has(idx)) continue; // no doubling up in a line-up
+      taken.add(idx);
+      players.push(pool[idx]);
+    }
+    const rating = players.reduce((a, p) => a + p[1], 0) / players.length;
+    players.sort((a, b) => b[1] - a[1]);
+    out.push({ rating, label: `${decade}s All-Stars (${rating.toFixed(1)})`, players });
   }
   return out;
 }
@@ -224,7 +235,12 @@ export function simulateSeason(
       const i = drawIdx(storyRand);
       const win = storyRand() < oppProbs[i];
       if (win) wins++;
-      games.push({ round: `R${g + 1}`, oppLabel: oppLabelOf(i), win });
+      games.push({
+        round: `R${g + 1}`,
+        oppLabel: oppLabelOf(i),
+        oppIdx: opponents && opponents.length ? i : null,
+        win,
+      });
     }
     if (wins === modalWins) {
       story = games;

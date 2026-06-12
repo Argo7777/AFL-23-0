@@ -9,6 +9,7 @@ export interface BoardEntry {
   f: boolean;
   m: string;
   t: number;
+  fin?: string; // finals result: QF/SF/PF/GF exit, or P for premiers
 }
 
 const NAME_KEY = "afl230-coach-name";
@@ -24,7 +25,7 @@ export function setCoachName(n: string) {
 
 export async function submitScore(s: {
   name: string; wins: number; losses: number; rating: number;
-  flag: boolean; mode: string; daily?: string;
+  flag: boolean; mode: string; fin?: string; daily?: string;
 }): Promise<boolean> {
   if (!LEADERBOARD_URL) return false;
   try {

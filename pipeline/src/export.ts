@@ -134,14 +134,19 @@ export function exportData() {
   }
   writeFileSync(join(OUT_DIR, "onthisday.json"), JSON.stringify(onThisDay));
 
-  // ---- top player ratings per decade (synthetic all-star opponents) ----
-  const topRatings: Record<string, number[]> = {};
+  // ---- top players per decade (synthetic all-star opponents) ----
+  // [name, best rating, primary club] so opposing line-ups can be inspected
+  const topRatings: Record<string, [string, number, string][]> = {};
   for (const decade of decades) {
     topRatings[decade] = players
       .filter((p) => p.decade === decade)
-      .map((p) => p.best)
-      .sort((a, b) => b - a)
-      .slice(0, 100);
+      .sort((a, b) => b.best - a.best)
+      .slice(0, 100)
+      .map((p) => [
+        p.name,
+        p.best,
+        [...p.clubs.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "",
+      ]);
   }
   writeFileSync(join(OUT_DIR, "topratings.json"), JSON.stringify(topRatings));
 

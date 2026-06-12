@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Meta, Mode, Pick } from "@/lib/game/types";
-import { SeriesResult, SimResult } from "@/lib/game/sim";
+import { OppTeam, SeriesResult, SimResult } from "@/lib/game/sim";
+import { CULT_BOOST } from "@/lib/game/cultHeroes";
 import { buildShareCard } from "@/lib/game/shareCard";
 import { Badge, dailyNumber, flagLastGame, todayMelbourne } from "@/lib/game/profile";
 import { coachName, LEADERBOARD_URL, setCoachName, submitScore } from "@/lib/game/leaderboard";
@@ -45,6 +46,8 @@ export default function ResultView({
   series,
   newBadges,
   replay,
+  opponents,
+  cultCount,
 }: {
   mode: Mode;
   roster: (Pick | null)[];
@@ -61,6 +64,8 @@ export default function ResultView({
   series?: SeriesResult | null;
   newBadges?: Badge[];
   replay?: boolean;
+  opponents?: OppTeam[];
+  cultCount?: number;
 }) {
   const [copied, setCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
@@ -68,6 +73,8 @@ export default function ResultView({
   const [ladderName, setLadderName] = useState("");
   const [ladderState, setLadderState] = useState<"idle" | "sending" | "done" | "failed">("idle");
   const [flagWon, setFlagWon] = useState(false);
+  const [finResult, setFinResult] = useState(""); // QF/SF/PF/GF exit or P
+  const [oppView, setOppView] = useState<OppTeam | null>(null);
 
   useEffect(() => setLadderName(coachName()), []);
 
@@ -78,7 +85,7 @@ export default function ResultView({
     const ok = await submitScore({
       name: ladderName.trim(), wins: sim.wins, losses: sim.losses,
       rating: Math.round(teamRating * 10) / 10,
-      flag: flagWon, mode,
+      flag: flagWon, mode, fin: finResult,
       ...(daily ? { daily: todayMelbourne() } : {}),
     });
     setLadderState(ok ? "done" : "failed");
@@ -252,6 +259,11 @@ export default function ResultView({
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-slate-400">
           <span>
             Team rating <b className="text-slate-100">{teamRating.toFixed(1)}</b>
+            {(cultCount ?? 0) > 0 && (
+              <span className="ml-1.5 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
+                🔥 cult hero +{CULT_BOOST * cultCount!}
+              </span>
+            )}
           </span>
           <span>
             Better than <b className="text-slate-100">{sim.realPercentile.toFixed(1)}%</b> of real{" "}
@@ -280,6 +292,7 @@ export default function ResultView({
               setFlagWon(true);
               if (!replay) flagLastGame();
             }}
+            onResult={setFinResult}
           />
         ) : (
           !spoon && mode !== "gauntlet" && (
@@ -324,24 +337,26 @@ export default function ResultView({
               </summary>
               <div className="mt-3 grid gap-1 sm:grid-cols-2">
                 {sim.story.map((g, i) => {
-                  const finalGame = false;
+                  const clickable = g.oppIdx != null && opponents?.[g.oppIdx];
                   return (
-                    <div
+                    <button
                       key={i}
-                      className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs ${
-                        finalGame ? "bg-gold/10" : g.win ? "bg-pitch" : "bg-hot/10"
-                      } ${finalGame ? "sm:col-span-2" : ""}`}
+                      disabled={!clickable}
+                      onClick={() => clickable && setOppView(opponents![g.oppIdx!])}
+                      className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-left text-xs ${
+                        g.win ? "bg-pitch" : "bg-hot/10"
+                      } ${clickable ? "cursor-pointer hover:ring-1 hover:ring-ice/50" : ""}`}
                     >
-                      <span className={`w-8 shrink-0 font-display font-black ${finalGame ? "w-auto pr-2 text-gold" : "text-slate-500"}`}>
+                      <span className="w-8 shrink-0 font-display font-black text-slate-500">
                         {g.round}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-slate-300">
-                        vs {g.oppLabel}
+                        vs {g.oppLabel}{clickable ? " ▸" : ""}
                       </span>
                       <span className={`ml-2 font-display font-black ${g.win ? "text-grass" : "text-hot"}`}>
                         {g.win ? "W" : "L"}
                       </span>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -395,6 +410,34 @@ export default function ResultView({
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* opposing line-up viewer */}
+      {oppView && (
+        <div
+          className="fixed inset-0 z-30 flex items-end justify-center bg-pitch/80 backdrop-blur-sm sm:items-center"
+          onClick={() => setOppView(null)}
+        >
+          <div
+            className="pop max-h-[80dvh] w-full max-w-sm overflow-y-auto rounded-t-2xl border border-line bg-card p-5 sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div className="font-display text-xl font-black">{oppView.label}</div>
+              <button onClick={() => setOppView(null)} className="rounded-lg border border-line px-2.5 py-1 text-xs text-slate-400 hover:border-grass/50">✕</button>
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500">the side they fielded against you</p>
+            <div className="mt-3 grid gap-1">
+              {oppView.players.map(([name, rating, club], i) => (
+                <div key={i} className="flex items-center gap-2 rounded-lg bg-pitch px-3 py-1.5 text-sm">
+                  <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">{name}</span>
+                  <span className="shrink-0 text-xs text-slate-500">{club}</span>
+                  <span className="shrink-0 font-display font-black text-grass">{Math.round(rating)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

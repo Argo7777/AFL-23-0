@@ -227,8 +227,13 @@ export default function Home() {
                     {i + 1}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
-                    {e.n} {e.f && "🏆"}
+                    {e.n}
                   </span>
+                  {e.fin && (
+                    <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${e.fin === "P" ? "bg-gold/20 text-gold" : "bg-ice/10 text-ice"}`}>
+                      {e.fin === "P" ? "🏆" : e.fin}
+                    </span>
+                  )}
                   <span className="shrink-0 font-display font-black text-grass">{e.w}-{e.l}</span>
                 </div>
               ))}

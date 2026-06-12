@@ -9,6 +9,16 @@ const MODE_LABEL: Record<string, string> = {
   classic5: "Classic 5", full23: "Full 23", cap23: "Salary Cap",
 };
 
+/** how September ended for this entry */
+function FinChip({ fin }: { fin?: string }) {
+  if (!fin) return null;
+  return fin === "P" ? (
+    <span className="shrink-0 rounded-full bg-gold/20 px-1.5 py-0.5 text-[10px] font-bold text-gold">🏆 PREMIERS</span>
+  ) : (
+    <span className="shrink-0 rounded-full bg-ice/10 px-1.5 py-0.5 text-[10px] font-bold text-ice">out in {fin}</span>
+  );
+}
+
 function DailyBoard({ entries }: { entries: BoardEntry[] }) {
   return (
     <section className="rounded-2xl border border-line bg-pitch-light p-4">
@@ -23,8 +33,9 @@ function DailyBoard({ entries }: { entries: BoardEntry[] }) {
               {i + 1}
             </span>
             <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
-              {e.n} {e.f && "🏆"}
+              {e.n}
             </span>
+            <FinChip fin={e.fin} />
             <span className="shrink-0 text-xs text-slate-500">r{e.r.toFixed(0)}</span>
             <span className="w-12 shrink-0 text-right font-display font-black text-grass">
               {e.w}-{e.l}
@@ -51,8 +62,9 @@ function ClubBoard({ entries }: { entries: BoardEntry[] }) {
           <div key={i} className="flex items-center gap-3 rounded-lg bg-pitch px-3 py-1.5 text-sm">
             <span className="shrink-0 font-display font-black text-grass">23-0</span>
             <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
-              {e.n} {e.f && "🏆"}
+              {e.n}
             </span>
+            <FinChip fin={e.fin} />
             <span className="shrink-0 text-xs text-slate-500">{MODE_LABEL[e.m] ?? e.m}</span>
             <span className="shrink-0 text-xs text-slate-500">
               {new Date(e.t).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
@@ -77,7 +89,7 @@ export default function LadderPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
+      <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
       <h1 className="font-display mt-4 text-3xl font-black">The Global Ladder</h1>
       <p className="mt-1 text-sm text-slate-400">
         Today&apos;s daily contest, and the immortals who went 23-0. Post a score from any result screen.

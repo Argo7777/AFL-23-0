@@ -133,7 +133,7 @@ export default function HigherPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <div className="flex items-center justify-between">
-        <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
+        <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
         <div className="text-sm text-slate-400">
           Streak <b className="font-display text-xl text-grass">{streak}</b>
           <span className="mx-2 text-slate-600">·</span>

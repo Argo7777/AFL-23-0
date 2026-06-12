@@ -92,7 +92,7 @@ export default function About() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
+      <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
       <h1 className="font-display mt-6 text-4xl font-black">About the numbers</h1>
       {sections.map((s) => (
         <section key={s.h} className="mt-8">

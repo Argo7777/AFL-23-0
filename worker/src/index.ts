@@ -16,6 +16,7 @@ interface Entry {
   f: boolean; // premiers
   m: string; // mode
   t: number; // timestamp
+  fin: string; // finals result: QF/SF/PF/GF exit, P premiers, "" not played
 }
 
 const ALLOWED_ORIGINS = [
@@ -67,7 +68,10 @@ export default {
           !Number.isFinite(rating) || rating < 0 || rating > 100) {
         return new Response(`{"error":"invalid"}`, { status: 400, headers });
       }
-      const entry: Entry = { n: name, w: wins, l: losses, r: rating, f: Boolean(body.flag), m: mode, t: Date.now() };
+      const fin = ["QF", "SF", "PF", "GF", "P"].includes(String(body.fin)) ? String(body.fin) : "";
+      const entry: Entry = {
+        n: name, w: wins, l: losses, r: rating, f: Boolean(body.flag), m: mode, t: Date.now(), fin,
+      };
       if (/^\d{4}-\d{2}-\d{2}$/.test(daily)) await addTo(env, `d:${daily}`, entry);
       // the 23-0 Club: perfect seasons only, newest first
       if (wins === 23 && losses === 0 && mode !== "spoon" && mode !== "gauntlet") {
