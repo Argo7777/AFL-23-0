@@ -17,6 +17,7 @@ export async function buildShareCard(
   sim: SimResult,
   teamRating: number,
   flagWon = false,
+  subLine?: string,
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -54,7 +55,7 @@ export async function buildShareCard(
   ctx.fillStyle = "#cbd5e1";
   ctx.font = `500 34px Arial, sans-serif`;
   ctx.fillText(
-    `Team rating ${teamRating.toFixed(1)}  ·  better than ${sim.realPercentile.toFixed(0)}% of real teams`,
+    subLine ?? `Team rating ${teamRating.toFixed(1)}  ·  better than ${sim.realPercentile.toFixed(0)}% of real teams`,
     W / 2,
     y,
   );

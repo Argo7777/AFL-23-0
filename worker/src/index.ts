@@ -52,6 +52,16 @@ export default {
     const url = new URL(req.url);
 
     if (req.method === "POST" && url.pathname === "/score") {
+      // naive per-IP rate limit: 3 posts per minute keeps the boards honest
+      // (a season + its finals update fit comfortably; spam scripts don't)
+      const ip = req.headers.get("CF-Connecting-IP") ?? "unknown";
+      const rlKey = `rl:${ip}`;
+      const count = Number((await env.BOARD.get(rlKey)) ?? 0);
+      if (count >= 3) {
+        return new Response(`{"error":"slow down"}`, { status: 429, headers });
+      }
+      await env.BOARD.put(rlKey, String(count + 1), { expirationTtl: 60 });
+
       let body: Record<string, unknown>;
       try {
         body = await req.json();

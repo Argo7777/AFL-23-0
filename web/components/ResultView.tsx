@@ -138,7 +138,12 @@ export default function ResultView({
         } with my all-era AFL team. Build yours:`;
 
   async function cardFile(): Promise<File> {
-    const blob = await buildShareCard(mode, roster, sim, teamRating, flagWon);
+    const blob = await buildShareCard(
+      mode, roster, sim, teamRating, flagWon,
+      draftPct != null
+        ? `Team rating ${teamRating.toFixed(1)}  ·  drafted ${draftPct.toFixed(0)}% of the spins' ${spoon ? "floor" : "ceiling"}`
+        : undefined,
+    );
     return new File([blob], "my-afl-23-0-season.png", { type: "image/png" });
   }
 
