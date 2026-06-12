@@ -77,7 +77,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           defer
           src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "b75504cea85842969120dffc5b746484"}'
+          data-cf-beacon='{"token": "e331b8f3ea0642bfa98ab6e67114f860"}'
         />
       </body>
     </html>

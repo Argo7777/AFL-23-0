@@ -44,6 +44,13 @@ export function exportData() {
 
   mkdirSync(OUT_DIR, { recursive: true });
 
+  // debut year per player (full career, not decade-clamped) for age modelling
+  const debutByKey = new Map<string, number>();
+  for (const r of db.prepare(`SELECT player_key k, MIN(year) y FROM season_stats GROUP BY player_key`).all() as
+    { k: string; y: number }[]) {
+    debutByKey.set(r.k, r.y);
+  }
+
   // ---- per-decade player files ----
   const decades = [...new Set(players.map((p) => p.decade))].sort();
   const capByDecade: Record<string, number> = {};
@@ -57,6 +64,7 @@ export function exportData() {
         g: p.games,
         h: p.height,
         y: p.years,
+        d0: debutByKey.get(p.key) ?? p.years[0],
         sea: [...p.seasons.entries()]
           .sort((a, b) => a[0] - b[0])
           .map(([yr, s]) => [yr, ...s]),

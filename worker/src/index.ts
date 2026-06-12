@@ -69,7 +69,12 @@ export default {
       }
       const entry: Entry = { n: name, w: wins, l: losses, r: rating, f: Boolean(body.flag), m: mode, t: Date.now() };
       if (/^\d{4}-\d{2}-\d{2}$/.test(daily)) await addTo(env, `d:${daily}`, entry);
-      await addTo(env, "alltime", entry);
+      // the 23-0 Club: perfect seasons only, newest first
+      if (wins === 23 && losses === 0 && mode !== "spoon" && mode !== "gauntlet") {
+        const cur = JSON.parse((await env.BOARD.get("club230")) ?? "[]") as Entry[];
+        cur.unshift(entry);
+        await env.BOARD.put("club230", JSON.stringify(cur.slice(0, 200)));
+      }
       return new Response(`{"ok":true}`, { headers });
     }
 
@@ -78,8 +83,8 @@ export default {
       const daily = /^\d{4}-\d{2}-\d{2}$/.test(d)
         ? JSON.parse((await env.BOARD.get(`d:${d}`)) ?? "[]")
         : [];
-      const alltime = JSON.parse((await env.BOARD.get("alltime")) ?? "[]");
-      return new Response(JSON.stringify({ daily, alltime }), {
+      const club = JSON.parse((await env.BOARD.get("club230")) ?? "[]");
+      return new Response(JSON.stringify({ daily, club }), {
         headers: { ...headers, "Cache-Control": "public, max-age=30" },
       });
     }

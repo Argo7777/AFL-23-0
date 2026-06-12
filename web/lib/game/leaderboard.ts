@@ -39,12 +39,13 @@ export async function submitScore(s: {
   }
 }
 
-export async function fetchBoard(daily: string): Promise<{ daily: BoardEntry[]; alltime: BoardEntry[] } | null> {
+export async function fetchBoard(daily: string): Promise<{ daily: BoardEntry[]; club: BoardEntry[] } | null> {
   if (!LEADERBOARD_URL) return null;
   try {
     const res = await fetch(`${LEADERBOARD_URL}/board?d=${daily}`);
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    return { daily: data.daily ?? [], club: data.club ?? [] };
   } catch {
     return null;
   }

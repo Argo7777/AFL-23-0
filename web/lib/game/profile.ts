@@ -44,6 +44,14 @@ export function recordGame(rec: GameRecord): Badge[] {
   return badges(p).filter((b) => !before.has(b.label));
 }
 
+/** mark the most recent recorded game as a premiership (finals won) */
+export function flagLastGame() {
+  const p = readProfile();
+  if (!p.games.length) return;
+  p.games[p.games.length - 1].flag = true;
+  try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ }
+}
+
 /** Melbourne-time date string — footy runs on AEST */
 export function todayMelbourne(): string {
   return new Intl.DateTimeFormat("en-CA", {

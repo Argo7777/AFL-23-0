@@ -16,6 +16,7 @@ export async function buildShareCard(
   roster: (Pick | null)[],
   sim: SimResult,
   teamRating: number,
+  flagWon = false,
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = W;
@@ -44,7 +45,7 @@ export async function buildShareCard(
   ctx.fillText(`${sim.wins}–${sim.losses}`, W / 2, 250);
 
   let y = 320;
-  if (sim.finals.modal === "premiers") {
+  if (flagWon) {
     ctx.fillStyle = "#fbbf24";
     ctx.font = `900 64px ${FONT}`;
     ctx.fillText("🏆 PREMIERS", W / 2, y);
@@ -53,7 +54,7 @@ export async function buildShareCard(
   ctx.fillStyle = "#cbd5e1";
   ctx.font = `500 34px Arial, sans-serif`;
   ctx.fillText(
-    `Team rating ${teamRating.toFixed(1)}  ·  flag in ${sim.finals.premiersPct.toFixed(0)}% of seasons`,
+    `Team rating ${teamRating.toFixed(1)}  ·  better than ${sim.realPercentile.toFixed(0)}% of real teams`,
     W / 2,
     y,
   );

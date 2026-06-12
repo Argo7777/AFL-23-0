@@ -7,6 +7,7 @@ export interface PlayerEntry {
   g: number; // games in decade
   h?: number | null; // height cm where known
   y: [number, number];
+  d0?: number; // career debut year (full career, for age modelling)
   c: Record<string, number>; // club -> games
   r: Record<Position, number>; // rating per position, 0-100
   nat: Position;

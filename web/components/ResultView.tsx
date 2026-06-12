@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Mode, Pick } from "@/lib/game/types";
-import { FinalsOutcome, SeriesResult, SimResult } from "@/lib/game/sim";
+import { Meta, Mode, Pick } from "@/lib/game/types";
+import { SeriesResult, SimResult } from "@/lib/game/sim";
 import { buildShareCard } from "@/lib/game/shareCard";
-import { Badge, dailyNumber, todayMelbourne } from "@/lib/game/profile";
+import { Badge, dailyNumber, flagLastGame, todayMelbourne } from "@/lib/game/profile";
 import { coachName, LEADERBOARD_URL, setCoachName, submitScore } from "@/lib/game/leaderboard";
+import { FINALS_QUALIFY_WINS } from "@/lib/game/finals";
+import FinalsCampaign from "@/components/FinalsCampaign";
 import Confetti from "@/components/Confetti";
 import TeamField from "@/components/TeamField";
 
@@ -27,21 +29,13 @@ function useCountUp(target: number, ms = 1100): number {
   return v;
 }
 
-const FINALS_LABELS: Record<FinalsOutcome, string> = {
-  premiers: "Premiers",
-  runnerUp: "Grand Final loss",
-  prelim: "Preliminary final exit",
-  semi: "Semi final exit",
-  elim: "Out in week one",
-  missed: "Missed September",
-};
-
 export default function ResultView({
   mode,
   roster,
   teamRating,
   sim,
   eras,
+  meta,
   shareUrl,
   challengeUrl,
   oppLabels,
@@ -50,12 +44,14 @@ export default function ResultView({
   spoon,
   series,
   newBadges,
+  replay,
 }: {
   mode: Mode;
   roster: (Pick | null)[];
   teamRating: number;
   sim: SimResult;
   eras: number[];
+  meta: Meta | null;
   shareUrl: string;
   challengeUrl: string;
   oppLabels: string[];
@@ -64,12 +60,14 @@ export default function ResultView({
   spoon?: boolean;
   series?: SeriesResult | null;
   newBadges?: Badge[];
+  replay?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [ladderName, setLadderName] = useState("");
   const [ladderState, setLadderState] = useState<"idle" | "sending" | "done" | "failed">("idle");
+  const [flagWon, setFlagWon] = useState(false);
 
   useEffect(() => setLadderName(coachName()), []);
 
@@ -80,7 +78,7 @@ export default function ResultView({
     const ok = await submitScore({
       name: ladderName.trim(), wins: sim.wins, losses: sim.losses,
       rating: Math.round(teamRating * 10) / 10,
-      flag: !spoon && sim.finals.modal === "premiers", mode,
+      flag: flagWon, mode,
       ...(daily ? { daily: todayMelbourne() } : {}),
     });
     setLadderState(ok ? "done" : "failed");
@@ -90,24 +88,25 @@ export default function ResultView({
   const shownWins = useCountUp(sim.wins);
   const shownLosses = useCountUp(sim.losses);
   const maxDist = Math.max(...sim.distribution);
+  const finalsEligible = !spoon && mode !== "gauntlet" && sim.wins >= FINALS_QUALIFY_WINS;
 
   const targetWins = targetRecord ? Number(targetRecord.split("-")[0]) : null;
   const beatTarget = targetWins != null ? sim.wins - targetWins : null;
 
   const shareText = daily
     ? `AFL 23-0 Daily #${dailyNumber()}: ${sim.wins}-${sim.losses}${
-        sim.finals.modal === "premiers" ? " 🏆" : ""
+        flagWon ? " 🏆" : ""
       }${perfect ? " — PERFECTION" : ""}. Play today's:`
     : spoon
       ? `I went ${sim.wins}-${sim.losses} chasing the wooden spoon 🥄${
           perfect ? " — PERFECT SPOON!" : ""
         } on AFL 23-0. Build worse:`
       : `I went ${sim.wins}-${sim.losses}${
-          sim.finals.modal === "premiers" ? " and won the flag 🏆" : ""
+          flagWon ? " and won the flag 🏆" : ""
         } with my all-era AFL team. Build yours:`;
 
   async function cardFile(): Promise<File> {
-    const blob = await buildShareCard(mode, roster, sim, teamRating);
+    const blob = await buildShareCard(mode, roster, sim, teamRating, flagWon);
     return new File([blob], "my-afl-23-0-season.png", { type: "image/png" });
   }
 
@@ -163,7 +162,7 @@ export default function ResultView({
 
   return (
     <div className="mx-auto max-w-5xl pop">
-      {((!spoon && sim.finals.modal === "premiers") || perfect) && <Confetti big={perfect} />}
+      {(flagWon || perfect) && <Confetti big={perfect || flagWon} />}
       <div className="text-center">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
           {daily ? `daily challenge #${dailyNumber()}` : spoon ? "the spoon chase" : "your season"}
@@ -175,7 +174,7 @@ export default function ResultView({
         >
           {shownWins}–{shownLosses}
         </div>
-        {!spoon && sim.finals.modal === "premiers" && (
+        {flagWon && (
           <div className="font-display mt-1 text-2xl font-black text-gold sm:text-3xl">
             🏆 PREMIERS
           </div>
@@ -236,14 +235,16 @@ export default function ResultView({
               : sim.wins <= 3
                 ? "Gloriously bad — but those wins cost you the spoon."
                 : "Too talented for the spoon. Try drafting worse."
-            : perfect && sim.finals.modal === "premiers"
-              ? "PERFECTION. Undefeated, and the flag to prove it."
-              : sim.finals.modal === "premiers"
-                ? "A September juggernaut — this side salutes more often than not."
+            : flagWon
+              ? perfect
+                ? "PERFECTION. Undefeated, and the flag to prove it."
+                : "Premiers. The hardest prize in the game, won."
+              : perfect
+                ? "An undefeated season — now win the one that matters."
                 : sim.wins >= 20
-                  ? "An all-time great season — September is theirs to lose."
-                  : sim.finals.modal !== "missed"
-                    ? `Finals footy: most seasons end in a ${FINALS_LABELS[sim.finals.modal].toLowerCase()}.`
+                  ? "An all-time great season. September will test it."
+                  : finalsEligible
+                    ? "Finals footy awaits — and finals show no mercy."
                     : sim.wins >= 10
                       ? "Mid-table. September watches on from the couch."
                       : "Back to the drawing board, coach."}
@@ -261,16 +262,32 @@ export default function ResultView({
               Goes 0-23 in <b className="text-slate-100">{sim.distribution[0].toFixed(1)}%</b> of seasons
             </span>
           ) : (
-            <>
-              <span>
-                Goes 23-0 in <b className="text-slate-100">{sim.perfectPct.toFixed(1)}%</b> of seasons
-              </span>
-              <span>
-                Wins the flag in <b className="text-gold">{sim.finals.premiersPct.toFixed(1)}%</b>
-              </span>
-            </>
+            <span>
+              Goes 23-0 in <b className="text-slate-100">{sim.perfectPct.toFixed(1)}%</b> of seasons
+            </span>
           )}
         </div>
+
+        {/* September: a separate, brutal campaign */}
+        {finalsEligible ? (
+          <FinalsCampaign
+            mode={mode}
+            eras={eras}
+            meta={meta}
+            initialRoster={roster}
+            oppLabels={oppLabels}
+            onFlag={() => {
+              setFlagWon(true);
+              if (!replay) flagLastGame();
+            }}
+          />
+        ) : (
+          !spoon && mode !== "gauntlet" && (
+            <p className="mt-4 text-sm text-slate-500">
+              {sim.wins}-{sim.losses} misses September — {FINALS_QUALIFY_WINS}+ wins books a finals berth.
+            </p>
+          )
+        )}
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(280px,380px)_1fr]">
@@ -300,38 +317,14 @@ export default function ResultView({
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-line bg-pitch-light p-4">
-            <p className="mb-2 text-[11px] uppercase tracking-widest text-slate-500">
-              September — how the campaign ends ({sim.finals.madeFinalsPct.toFixed(0)}% of seasons make finals)
-            </p>
-            <div className="grid gap-1.5">
-              {(["premiers", "runnerUp", "prelim", "semi", "elim", "missed"] as FinalsOutcome[]).map((o) => (
-                <div key={o} className="flex items-center gap-2 text-xs">
-                  <span className={`w-28 shrink-0 sm:w-36 ${o === "premiers" ? "font-bold text-gold" : "text-slate-400"}`}>
-                    {FINALS_LABELS[o]}
-                  </span>
-                  <div className="h-2.5 flex-1 overflow-hidden rounded bg-pitch">
-                    <div
-                      className={`h-full rounded ${o === "premiers" ? "bg-gold" : o === "missed" ? "bg-line" : "bg-ice/60"}`}
-                      style={{ width: `${Math.min(100, sim.finals.pct[o])}%` }}
-                    />
-                  </div>
-                  <span className="w-12 shrink-0 text-right text-slate-300">
-                    {sim.finals.pct[o].toFixed(1)}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {sim.story.length > 0 && oppLabels.length > 0 && (
             <details className="mt-4 rounded-2xl border border-line bg-pitch-light p-4">
               <summary className="cursor-pointer text-[11px] uppercase tracking-widest text-slate-500">
                 Season story — round by round
               </summary>
               <div className="mt-3 grid gap-1 sm:grid-cols-2">
-                {sim.story.map((g, i) => {
-                  const finalGame = !g.round.startsWith("R");
+                {sim.story.filter((g) => g.round.startsWith("R")).map((g, i) => {
+                  const finalGame = false;
                   return (
                     <div
                       key={i}

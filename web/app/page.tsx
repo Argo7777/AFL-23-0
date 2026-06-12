@@ -49,7 +49,7 @@ export default function Home() {
   const [daily, setDaily] = useState<GameRecord | null>(null);
   const [prof, setProf] = useState<{ s: ReturnType<typeof summary>; b: Badge[] } | null>(null);
   const [oneClub, setOneClub] = useState("");
-  const [board, setBoard] = useState<{ daily: BoardEntry[]; alltime: BoardEntry[] } | null>(null);
+  const [board, setBoard] = useState<{ daily: BoardEntry[]; club: BoardEntry[] } | null>(null);
   const [otd, setOtd] = useState<{ y: number; r: string; t1: string; s1: number; t2: string; s2: number } | null>(null);
 
   useEffect(() => {
@@ -210,35 +210,54 @@ export default function Home() {
       </section>
 
       {/* global ladder — appears once the worker is live */}
-      {LEADERBOARD_URL && board && (board.daily.length > 0 || board.alltime.length > 0) && (
+      {LEADERBOARD_URL && board && (
         <section className="mt-8 grid gap-4 sm:grid-cols-2">
-          {([
-            [`Daily #${dailyNumber()} — world top 5`, board.daily],
-            ["All-time best seasons", board.alltime],
-          ] as [string, BoardEntry[]][]).map(([title, entries]) => (
-            <div key={title} className="rounded-2xl border border-line bg-pitch-light p-4">
-              <div className="flex items-baseline justify-between">
-                <h2 className="font-display text-lg font-black text-gold">{title}</h2>
-                <Link href="/ladder" className="text-xs text-ice hover:underline">full ladder →</Link>
-              </div>
-              <div className="mt-2 grid gap-1">
-                {entries.length === 0 && (
-                  <p className="py-2 text-center text-xs text-slate-500">no entries yet — be first</p>
-                )}
-                {entries.slice(0, 5).map((e, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded-lg bg-pitch px-3 py-1 text-sm">
-                    <span className={`w-5 shrink-0 text-right font-display font-black ${i < 3 ? "text-gold" : "text-slate-500"}`}>
-                      {i + 1}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
-                      {e.n} {e.f && "🏆"}
-                    </span>
-                    <span className="shrink-0 font-display font-black text-grass">{e.w}-{e.l}</span>
-                  </div>
-                ))}
-              </div>
+          <div className="rounded-2xl border border-line bg-pitch-light p-4">
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-display text-lg font-black text-gold">Daily #{dailyNumber()} — world top 5</h2>
+              <Link href="/ladder" className="text-xs text-ice hover:underline">full ladder →</Link>
             </div>
-          ))}
+            <div className="mt-2 grid gap-1">
+              {board.daily.length === 0 && (
+                <p className="py-2 text-center text-xs text-slate-500">no entries yet — be first</p>
+              )}
+              {board.daily.slice(0, 5).map((e, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-lg bg-pitch px-3 py-1 text-sm">
+                  <span className={`w-5 shrink-0 text-right font-display font-black ${i < 3 ? "text-gold" : "text-slate-500"}`}>
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
+                    {e.n} {e.f && "🏆"}
+                  </span>
+                  <span className="shrink-0 font-display font-black text-grass">{e.w}-{e.l}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-grass/50 bg-pitch-light p-4">
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-display text-lg font-black text-grass">The 23-0 Club</h2>
+              <Link href="/ladder" className="text-xs text-ice hover:underline">full ladder →</Link>
+            </div>
+            <div className="mt-2 grid gap-1">
+              {board.club.length === 0 && (
+                <p className="py-2 text-center text-xs text-slate-500">
+                  nobody has run the table yet — immortality awaits
+                </p>
+              )}
+              {board.club.slice(0, 5).map((e, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-lg bg-pitch px-3 py-1 text-sm">
+                  <span className="shrink-0 font-display font-black text-grass">23-0</span>
+                  <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
+                    {e.n} {e.f && "🏆"}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-500">
+                    {new Date(e.t).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
       )}
 

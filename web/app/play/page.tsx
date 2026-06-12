@@ -434,6 +434,7 @@ function PlayInner() {
           teamRating={teamRating}
           sim={sim}
           eras={eras}
+          meta={meta}
           shareUrl={shareUrl}
           challengeUrl={challengeUrl}
           oppLabels={oppLabels}
@@ -442,6 +443,7 @@ function PlayInner() {
           spoon={isSpoon}
           series={series}
           newBadges={newBadges}
+          replay={!!shared}
         />
       </main>
     );

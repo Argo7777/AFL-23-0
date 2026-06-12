@@ -5,10 +5,14 @@ import Link from "next/link";
 import { BoardEntry, fetchBoard, LEADERBOARD_URL } from "@/lib/game/leaderboard";
 import { dailyNumber, todayMelbourne } from "@/lib/game/profile";
 
-function Board({ title, entries }: { title: string; entries: BoardEntry[] }) {
+const MODE_LABEL: Record<string, string> = {
+  classic5: "Classic 5", full23: "Full 23", cap23: "Salary Cap",
+};
+
+function DailyBoard({ entries }: { entries: BoardEntry[] }) {
   return (
     <section className="rounded-2xl border border-line bg-pitch-light p-4">
-      <h2 className="font-display text-lg font-black text-gold">{title}</h2>
+      <h2 className="font-display text-lg font-black text-gold">Daily #{dailyNumber()} — today</h2>
       <div className="mt-2 grid gap-1">
         {entries.length === 0 && (
           <p className="py-4 text-center text-sm text-slate-500">No entries yet — be the first.</p>
@@ -32,8 +36,36 @@ function Board({ title, entries }: { title: string; entries: BoardEntry[] }) {
   );
 }
 
+function ClubBoard({ entries }: { entries: BoardEntry[] }) {
+  return (
+    <section className="rounded-2xl border border-grass/50 bg-pitch-light p-4">
+      <h2 className="font-display text-lg font-black text-grass">The 23-0 Club</h2>
+      <p className="mt-0.5 text-[11px] text-slate-500">perfect seasons only · newest first</p>
+      <div className="mt-2 grid gap-1">
+        {entries.length === 0 && (
+          <p className="py-4 text-center text-sm text-slate-500">
+            Nobody has run the table yet. Immortality awaits.
+          </p>
+        )}
+        {entries.map((e, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-lg bg-pitch px-3 py-1.5 text-sm">
+            <span className="shrink-0 font-display font-black text-grass">23-0</span>
+            <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
+              {e.n} {e.f && "🏆"}
+            </span>
+            <span className="shrink-0 text-xs text-slate-500">{MODE_LABEL[e.m] ?? e.m}</span>
+            <span className="shrink-0 text-xs text-slate-500">
+              {new Date(e.t).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function LadderPage() {
-  const [board, setBoard] = useState<{ daily: BoardEntry[]; alltime: BoardEntry[] } | null>(null);
+  const [board, setBoard] = useState<{ daily: BoardEntry[]; club: BoardEntry[] } | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -48,7 +80,7 @@ export default function LadderPage() {
       <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
       <h1 className="font-display mt-4 text-3xl font-black">The Global Ladder</h1>
       <p className="mt-1 text-sm text-slate-400">
-        Best seasons from coaches everywhere. Post a score from any result screen.
+        Today&apos;s daily contest, and the immortals who went 23-0. Post a score from any result screen.
       </p>
 
       {!LEADERBOARD_URL || (loaded && !board) ? (
@@ -59,8 +91,8 @@ export default function LadderPage() {
         <p className="mt-8 text-center text-slate-500">loading the ladder…</p>
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Board title={`Daily #${dailyNumber()} — today`} entries={board!.daily} />
-          <Board title="All-time best seasons" entries={board!.alltime} />
+          <DailyBoard entries={board!.daily} />
+          <ClubBoard entries={board!.club} />
         </div>
       )}
     </main>
