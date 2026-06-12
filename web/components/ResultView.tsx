@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Mode, Pick } from "@/lib/game/types";
 import { FinalsOutcome, SimResult } from "@/lib/game/sim";
 import { buildShareCard } from "@/lib/game/shareCard";
+import { dailyNumber } from "@/lib/game/profile";
+import Confetti from "@/components/Confetti";
 import TeamField from "@/components/TeamField";
 
 const FINALS_LABELS: Record<FinalsOutcome, string> = {
@@ -23,6 +25,10 @@ export default function ResultView({
   sim,
   eras,
   shareUrl,
+  challengeUrl,
+  oppLabels,
+  targetRecord,
+  daily,
 }: {
   mode: Mode;
   roster: (Pick | null)[];
@@ -30,16 +36,28 @@ export default function ResultView({
   sim: SimResult;
   eras: number[];
   shareUrl: string;
+  challengeUrl: string;
+  oppLabels: string[];
+  targetRecord?: string | null;
+  daily?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const [challengeCopied, setChallengeCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
   const picks = roster.filter((p): p is Pick => p !== null);
   const perfect = sim.wins === 23;
   const maxDist = Math.max(...sim.distribution);
 
-  const shareText = `I went ${sim.wins}-${sim.losses}${
-    sim.finals.modal === "premiers" ? " and won the flag 🏆" : ""
-  } with my all-era AFL team. Build yours:`;
+  const targetWins = targetRecord ? Number(targetRecord.split("-")[0]) : null;
+  const beatTarget = targetWins != null ? sim.wins - targetWins : null;
+
+  const shareText = daily
+    ? `AFL 23-0 Daily #${dailyNumber()}: ${sim.wins}-${sim.losses}${
+        sim.finals.modal === "premiers" ? " 🏆" : ""
+      }${perfect ? " — PERFECTION" : ""}. Play today's:`
+    : `I went ${sim.wins}-${sim.losses}${
+        sim.finals.modal === "premiers" ? " and won the flag 🏆" : ""
+      } with my all-era AFL team. Build yours:`;
 
   async function cardFile(): Promise<File> {
     const blob = await buildShareCard(mode, roster, sim, teamRating);
@@ -98,8 +116,11 @@ export default function ResultView({
 
   return (
     <div className="mx-auto max-w-5xl pop">
+      {(sim.finals.modal === "premiers" || perfect) && <Confetti big={perfect} />}
       <div className="text-center">
-        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">your season</p>
+        <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+          {daily ? `daily challenge #${dailyNumber()}` : "your season"}
+        </p>
         <div
           className={`font-display mt-2 text-6xl font-black sm:text-8xl ${
             perfect ? "text-grass" : sim.wins >= 18 ? "text-gold" : "text-slate-200"
@@ -110,6 +131,23 @@ export default function ResultView({
         {sim.finals.modal === "premiers" && (
           <div className="font-display mt-1 text-2xl font-black text-gold sm:text-3xl">
             🏆 PREMIERS
+          </div>
+        )}
+        {beatTarget != null && (
+          <div
+            className={`font-display mt-2 inline-block rounded-xl border px-4 py-1.5 text-lg font-black ${
+              beatTarget > 0
+                ? "border-grass bg-grass/10 text-grass"
+                : beatTarget === 0
+                  ? "border-gold bg-gold/10 text-gold"
+                  : "border-hot bg-hot/10 text-hot"
+            }`}
+          >
+            {beatTarget > 0
+              ? `🎯 CHALLENGE BEATEN — ${sim.wins}-${sim.losses} vs their ${targetRecord}`
+              : beatTarget === 0
+                ? `🤝 CHALLENGE TIED at ${targetRecord}`
+                : `❌ CHALLENGE LOST — ${sim.wins}-${sim.losses} vs their ${targetRecord}`}
           </div>
         )}
         <p className="mt-2 text-slate-300">
@@ -193,6 +231,37 @@ export default function ResultView({
             </div>
           </div>
 
+          {sim.story.length > 0 && oppLabels.length > 0 && (
+            <details className="mt-4 rounded-2xl border border-line bg-pitch-light p-4">
+              <summary className="cursor-pointer text-[11px] uppercase tracking-widest text-slate-500">
+                Season story — round by round
+              </summary>
+              <div className="mt-3 grid gap-1 sm:grid-cols-2">
+                {sim.story.map((g, i) => {
+                  const finalGame = !g.round.startsWith("R");
+                  return (
+                    <div
+                      key={i}
+                      className={`flex items-center justify-between rounded-lg px-2.5 py-1 text-xs ${
+                        finalGame ? "bg-gold/10" : g.win ? "bg-pitch" : "bg-hot/10"
+                      } ${finalGame ? "sm:col-span-2" : ""}`}
+                    >
+                      <span className={`w-8 shrink-0 font-display font-black ${finalGame ? "w-auto pr-2 text-gold" : "text-slate-500"}`}>
+                        {g.round}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-slate-300">
+                        vs {oppLabels[g.opp] ?? "?"}
+                      </span>
+                      <span className={`ml-2 font-display font-black ${g.win ? "text-grass" : "text-hot"}`}>
+                        {g.win ? "W" : "L"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          )}
+
           <div className="mt-4 grid max-h-105 gap-1.5 overflow-y-auto pr-1">
             {picks.map((pk, i) => (
               <div
@@ -255,6 +324,18 @@ export default function ResultView({
         >
           f
         </a>
+        <button
+          onClick={async () => {
+            await navigator.clipboard.writeText(
+              `Beat my ${sim.wins}-${sim.losses} — same spins, your picks: ${challengeUrl}`,
+            );
+            setChallengeCopied(true);
+            setTimeout(() => setChallengeCopied(false), 2000);
+          }}
+          className="rounded-xl border border-gold px-6 py-3 font-display text-lg font-black text-gold transition hover:bg-gold/10"
+        >
+          {challengeCopied ? "COPIED!" : "CHALLENGE A MATE 🎯"}
+        </button>
         <button
           onClick={async () => {
             await navigator.clipboard.writeText(shareUrl);

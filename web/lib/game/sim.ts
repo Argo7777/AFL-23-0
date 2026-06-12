@@ -8,6 +8,12 @@ export type FinalsOutcome =
   | "runnerUp" // lost the big one
   | "premiers";
 
+export interface StoryGame {
+  round: string; // "R1".."R23", "Qualifying Final", "Grand Final"…
+  opp: number; // index into the sorted strengths array (label lookup)
+  win: boolean;
+}
+
 export interface SimResult {
   wins: number;
   losses: number;
@@ -21,6 +27,8 @@ export interface SimResult {
     premiersPct: number;
     madeFinalsPct: number;
   };
+  /** one representative season matching the modal record & finals outcome */
+  story: StoryGame[];
 }
 
 /**
@@ -134,6 +142,54 @@ export function simulateSeason(
     outcomes[a] >= outcomes[b] ? a : b,
   );
 
+  // ---- the story: replay seasons until one matches the modal outcome ----
+  const storyRand = mulberry32(seed ^ 0x5eed);
+  let story: StoryGame[] = [];
+  for (let attempt = 0; attempt < 4000; attempt++) {
+    const games: StoryGame[] = [];
+    let wins = 0;
+    for (let g = 0; g < 23; g++) {
+      const oppIdx = Math.floor((0.25 + 0.75 * storyRand() ** 0.7) * (n - 1));
+      const win = storyRand() < winProb(userStrength, strengths[oppIdx]);
+      if (win) wins++;
+      games.push({ round: `R${g + 1}`, opp: oppIdx, win });
+    }
+    if (wins !== modalWins) continue;
+
+    const winShare = wins / 23;
+    let outcome: FinalsOutcome = "missed";
+    if (winShare >= qualifyShare) {
+      const final = (round: string, lo: number, hi: number): boolean => {
+        const oppIdx = Math.floor((lo + storyRand() * (hi - lo)) * (n - 1));
+        const win = storyRand() < winProb(userStrength, strengths[oppIdx]);
+        games.push({ round, opp: oppIdx, win });
+        return win;
+      };
+      if (winShare >= top4Share) {
+        if (final("Qualifying Final", 0.85, 1)) {
+          outcome = final("Preliminary Final", 0.85, 1)
+            ? final("Grand Final", 0.9, 1) ? "premiers" : "runnerUp"
+            : "prelim";
+        } else if (final("Semi Final", 0.7, 0.95)) {
+          outcome = final("Preliminary Final", 0.85, 1)
+            ? final("Grand Final", 0.9, 1) ? "premiers" : "runnerUp"
+            : "prelim";
+        } else {
+          outcome = "semi";
+        }
+      } else {
+        if (!final("Elimination Final", 0.62, 0.9)) outcome = "elim";
+        else if (!final("Semi Final", 0.7, 0.95)) outcome = "semi";
+        else if (!final("Preliminary Final", 0.85, 1)) outcome = "prelim";
+        else outcome = final("Grand Final", 0.9, 1) ? "premiers" : "runnerUp";
+      }
+    }
+    if (outcome === modalFinals) {
+      story = games;
+      break;
+    }
+  }
+
   return {
     wins: modalWins,
     losses: 23 - modalWins,
@@ -147,5 +203,6 @@ export function simulateSeason(
       premiersPct: finalsPct.premiers,
       madeFinalsPct: 100 - finalsPct.missed,
     },
+    story,
   };
 }

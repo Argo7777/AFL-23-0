@@ -5,7 +5,7 @@ export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 const playerCache = new Map<number, PlayerEntry[]>();
 let metaCache: Meta | null = null;
-let strengthsCache: Record<string, number[]> | null = null;
+let strengthsCache: Record<string, [number, string][]> | null = null;
 
 export async function loadMeta(): Promise<Meta> {
   if (!metaCache) {
@@ -22,11 +22,22 @@ export async function loadDecade(decade: number): Promise<PlayerEntry[]> {
   return playerCache.get(decade)!;
 }
 
-export async function loadStrengths(): Promise<Record<string, number[]>> {
+export async function loadStrengths(): Promise<Record<string, [number, string][]>> {
   if (!strengthsCache) {
     strengthsCache = await (await fetch(`${BASE_PATH}/data/strengths.json`)).json();
   }
   return strengthsCache!;
+}
+
+/** pool the selected decades into aligned, ascending values + labels */
+export function poolStrengths(
+  all: Record<string, [number, string][]>,
+  eras: number[],
+): { values: number[]; labels: string[] } {
+  const pairs = eras
+    .flatMap((e) => all[String(e)] ?? [])
+    .sort((a, b) => a[0] - b[0]);
+  return { values: pairs.map((p) => p[0]), labels: pairs.map((p) => p[1]) };
 }
 
 /** Players who played for `club` in `decade`, best rating first. */

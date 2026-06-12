@@ -3,12 +3,14 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { BASE_PATH, loadMeta, loadPool, loadStrengths } from "@/lib/game/data";
+import { BASE_PATH, loadMeta, loadPool, loadStrengths, poolStrengths } from "@/lib/game/data";
+import { dailySeed, recordGame, todayMelbourne } from "@/lib/game/profile";
 import { mulberry32, randomSeed } from "@/lib/game/rng";
 import { simulateSeason, SimResult } from "@/lib/game/sim";
 import {
   Meta, Mode, Pick, PlayerEntry, Slot, REROLLS, scoreInSlot,
 } from "@/lib/game/types";
+import { clubColors } from "@/lib/game/clubColors";
 import Spinner from "@/components/Spinner";
 import PlayerCard, { fmtSalary, honours } from "@/components/PlayerCard";
 import ResultView from "@/components/ResultView";
@@ -40,6 +42,8 @@ function PlayInner() {
   const params = useSearchParams();
   const mode = (params.get("mode") as Mode) || "classic5";
   const shared = params.get("d");
+  const isDaily = params.get("daily") === "1";
+  const targetRecord = params.get("target"); // a mate's "20-3" to beat
 
   const instances = useMemo(() => slotInstances(mode), [mode]);
   const totalPicks = instances.length;
@@ -48,7 +52,11 @@ function PlayInner() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [eras, setEras] = useState<number[]>([]);
   const [phase, setPhase] = useState<Phase>("loading");
-  const [seed] = useState<number>(() => randomSeed());
+  const [seed] = useState<number>(() => {
+    if (isDaily) return dailySeed(); // everyone gets today's spins
+    const fromUrl = Number(params.get("seed"));
+    return Number.isFinite(fromUrl) && fromUrl > 0 ? fromUrl : randomSeed();
+  });
   const rng = useRef<() => number>(() => Math.random());
   const [combo, setCombo] = useState<Combo | null>(null);
   const [pool, setPool] = useState<PlayerEntry[]>([]);
@@ -65,6 +73,8 @@ function PlayInner() {
   const [sim, setSim] = useState<SimResult | null>(null);
   const [teamRating, setTeamRating] = useState(0);
   const [shareUrl, setShareUrl] = useState("");
+  const [challengeUrl, setChallengeUrl] = useState("");
+  const [oppLabels, setOppLabels] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showField, setShowField] = useState(false); // mobile: field behind a toggle
 
@@ -138,10 +148,15 @@ function PlayInner() {
             if (rebuilt.some(Boolean)) {
               setEras(st.e);
               setRoster(rebuilt);
-              await finishGame(rebuilt, st.e, st.s, st.m);
+              await finishGame(rebuilt, st.e, st.s, st.m, true);
               return;
             }
           }
+        }
+        if (isDaily) {
+          // the daily plays the full 130 years, same for everyone
+          setEras(m.decades);
+          return;
         }
         const eraParam = params.get("eras");
         const modern = m.decades.filter((d) => d >= 1980);
@@ -169,14 +184,16 @@ function PlayInner() {
     finalEras: number[],
     simSeed: number,
     m: Mode,
+    isReplay = false,
   ) {
     const filled = finalRoster.filter((p): p is Pick => p !== null);
     const strengths = await loadStrengths();
-    const pooled = finalEras.flatMap((e) => strengths[String(e)] ?? []).sort((a, b) => a - b);
+    const { values, labels } = poolStrengths(strengths, finalEras);
     const rating = filled.reduce((a, p) => a + p.score, 0) / filled.length;
-    const result = simulateSeason(rating, pooled, simSeed);
+    const result = simulateSeason(rating, values, simSeed);
     setTeamRating(rating);
     setSim(result);
+    setOppLabels(labels);
     const payload = encodeShare({
       m, e: finalEras, s: simSeed,
       p: finalRoster
@@ -184,6 +201,18 @@ function PlayInner() {
         .filter(Boolean),
     });
     setShareUrl(`${window.location.origin}${BASE_PATH}/play/?mode=${m}&d=${payload}`);
+    setChallengeUrl(
+      `${window.location.origin}${BASE_PATH}/play/?mode=${m}&eras=${finalEras.join(",")}` +
+        `&seed=${seed}&target=${result.wins}-${result.losses}`,
+    );
+    if (!isReplay) {
+      recordGame({
+        t: Date.now(), mode: m, wins: result.wins, losses: result.losses,
+        flag: result.finals.modal === "premiers", perfect: result.wins === 23,
+        rating: Math.round(rating * 10) / 10, eras: finalEras,
+        ...(isDaily ? { daily: todayMelbourne() } : {}),
+      });
+    }
     setPhase("result");
   }
 
@@ -333,6 +362,10 @@ function PlayInner() {
           sim={sim}
           eras={eras}
           shareUrl={shareUrl}
+          challengeUrl={challengeUrl}
+          oppLabels={oppLabels}
+          targetRecord={targetRecord}
+          daily={isDaily}
         />
       </main>
     );
@@ -459,7 +492,11 @@ function PlayInner() {
             <div className={inSwap ? "mt-4" : "mt-1"}>
               {!inSwap && (
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h1 className="font-display text-3xl font-black">
+                  <h1 className="flex items-center gap-2.5 font-display text-3xl font-black">
+                    <span className="flex h-7 w-3 shrink-0 flex-col overflow-hidden rounded-sm">
+                      <span className="flex-1" style={{ background: clubColors(activeCombo.club)[0] }} />
+                      <span className="flex-1" style={{ background: clubColors(activeCombo.club)[1] }} />
+                    </span>
                     {activeCombo.club} <span className="text-gold">{activeCombo.decade}s</span>
                   </h1>
                   <button

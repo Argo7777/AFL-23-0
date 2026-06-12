@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadMeta } from "@/lib/game/data";
+import {
+  Badge, badges, dailyNumber, GameRecord, readProfile, summary, todaysDaily,
+} from "@/lib/game/profile";
 import { Meta, Mode } from "@/lib/game/types";
 
 const MODES: { id: Mode; name: string; tag: string; desc: string }[] = [
@@ -30,6 +33,8 @@ export default function Home() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [mode, setMode] = useState<Mode>("classic5");
   const [eras, setEras] = useState<Set<number>>(new Set());
+  const [daily, setDaily] = useState<GameRecord | null>(null);
+  const [prof, setProf] = useState<{ s: ReturnType<typeof summary>; b: Badge[] } | null>(null);
 
   useEffect(() => {
     loadMeta().then((m) => {
@@ -37,6 +42,9 @@ export default function Home() {
       // default to the modern game; the full 130 years is one tap away
       setEras(new Set(m.decades.filter((d) => d >= 1980)));
     });
+    setDaily(todaysDaily() ?? null);
+    const p = readProfile();
+    setProf({ s: summary(p), b: badges(p) });
   }, []);
 
   const toggleEra = (d: number) => {
@@ -69,6 +77,40 @@ export default function Home() {
           Every rating is derived from real career stats and honours.
         </p>
       </header>
+
+      {/* daily challenge */}
+      <section className="mt-8 rounded-2xl border border-gold/60 bg-card p-5 shadow-[0_0_24px_-8px] shadow-gold/40">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-gold">
+              one attempt · same spins for everyone · all 14 decades
+            </div>
+            <div className="font-display mt-1 text-2xl font-black">
+              Daily Challenge <span className="text-gold">#{dailyNumber()}</span>
+            </div>
+            {daily ? (
+              <p className="mt-1 text-sm text-slate-300">
+                Today: <b className="text-grass">{daily.wins}-{daily.losses}</b>
+                {daily.flag ? " 🏆" : ""} — back tomorrow for #{dailyNumber() + 1}.
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-slate-400">
+                Five picks, the whole world gets the same clubs and eras. Post your record.
+              </p>
+            )}
+          </div>
+          <Link
+            href="/play?daily=1"
+            className={`font-display rounded-xl px-6 py-3 text-lg font-black transition ${
+              daily
+                ? "border border-line text-slate-400 hover:border-gold/50"
+                : "bg-gold text-pitch hover:scale-105"
+            }`}
+          >
+            {daily ? "PLAY AGAIN (UNRANKED)" : "PLAY TODAY'S"}
+          </Link>
+        </div>
+      </section>
 
       <section className="mt-10 grid gap-4 sm:grid-cols-3">
         {MODES.map((m) => (
@@ -122,6 +164,34 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* coach's record */}
+      {prof?.s && (
+        <section className="mt-8 rounded-2xl border border-line bg-pitch-light p-5">
+          <h2 className="font-display text-xl font-black">Your coaching record</h2>
+          <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm text-slate-300">
+            <span>Seasons <b className="font-display text-lg text-slate-100">{prof.s.played}</b></span>
+            <span>Premierships <b className="font-display text-lg text-gold">{prof.s.flags}</b></span>
+            <span>Best <b className="font-display text-lg text-grass">{prof.s.best}</b></span>
+            {prof.s.perfects > 0 && (
+              <span>Perfect seasons <b className="font-display text-lg text-grass">{prof.s.perfects}</b></span>
+            )}
+          </div>
+          {prof.b.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {prof.b.map((b) => (
+                <span
+                  key={b.label}
+                  className="rounded-full bg-gold/10 px-2.5 py-1 text-[11px] font-semibold text-gold"
+                >
+                  {b.emoji} {b.label}
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="mt-2 text-[10px] text-slate-600">Stored on this device only.</p>
+        </section>
+      )}
 
       <div className="mt-8 text-center">
         <Link

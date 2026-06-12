@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { clubColors } from "@/lib/game/clubColors";
 
 /** Slot-machine style reveal of the rolled club + era. Pure presentation. */
 export default function Spinner({
@@ -52,6 +53,10 @@ export default function Spinner({
           <div className="font-display text-3xl font-black sm:text-5xl">{display.club}</div>
           <div className="mt-2 font-display text-2xl font-black text-gold sm:text-3xl">
             {display.decade}s
+          </div>
+          <div className="mx-auto mt-3 flex h-1.5 w-24 overflow-hidden rounded-full">
+            <span className="flex-1" style={{ background: clubColors(display.club)[0] }} />
+            <span className="flex-1" style={{ background: clubColors(display.club)[1] }} />
           </div>
         </div>
       </div>

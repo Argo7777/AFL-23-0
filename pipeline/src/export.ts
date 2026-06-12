@@ -85,11 +85,15 @@ export function exportData() {
   }
 
   // ---- strengths ----
-  const strengthsByDecade: Record<string, number[]> = {};
+  // [strength, "Club YYYY"] tuples so the sim can narrate real opponents
+  const strengthsByDecade: Record<string, [number, string][]> = {};
   for (const s of strengths) {
-    (strengthsByDecade[s.decade] ??= []).push(Math.round(s.strength * 1000) / 1000);
+    (strengthsByDecade[s.decade] ??= []).push([
+      Math.round(s.strength * 1000) / 1000,
+      `${s.year} ${s.club}`,
+    ]);
   }
-  for (const d of Object.keys(strengthsByDecade)) strengthsByDecade[d].sort((a, b) => a - b);
+  for (const d of Object.keys(strengthsByDecade)) strengthsByDecade[d].sort((a, b) => a[0] - b[0]);
   writeFileSync(join(OUT_DIR, "strengths.json"), JSON.stringify(strengthsByDecade));
 
   // ---- meta: which clubs exist per decade (from real fixtures) ----

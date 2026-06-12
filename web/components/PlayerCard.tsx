@@ -1,5 +1,6 @@
 "use client";
 
+import { clubColors } from "@/lib/game/clubColors";
 import { PlayerEntry, Slot } from "@/lib/game/types";
 
 const fmtSalary = (s: number) =>
@@ -48,6 +49,7 @@ export default function PlayerCard({
     <button
       onClick={onPick}
       disabled={disabled}
+      style={{ borderLeft: `4px solid ${clubColors(club)[0]}` }}
       className={`w-full rounded-xl border border-line bg-card p-3 text-left transition ${
         disabled ? "opacity-40" : "hover:border-grass/60 hover:bg-card-hover"
       }`}
