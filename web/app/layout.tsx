@@ -1,5 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover", // draw into the notch / dynamic island
+  themeColor: "#0b1120",
+};
 
 const SITE = "https://afl23-0.com";
 const DESCRIPTION =
@@ -34,6 +41,15 @@ export const metadata: Metadata = {
     images: ["/og.png"],
   },
   robots: { index: true, follow: true },
+  icons: {
+    icon: [{ url: "/icon-192.png", sizes: "192x192" }, { url: "/icon.svg", type: "image/svg+xml" }],
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "AFL 23-0",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 const jsonLd = {

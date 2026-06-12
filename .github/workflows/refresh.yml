@@ -34,6 +34,8 @@ jobs:
           git push
       # GITHUB_TOKEN pushes don't trigger other workflows, so deploy here too
       - run: npm run build -w web
+        env:
+          NEXT_PUBLIC_LEADERBOARD_URL: ${{ vars.LEADERBOARD_URL }}
       - name: Publish to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:

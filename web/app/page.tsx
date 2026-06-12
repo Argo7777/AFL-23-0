@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BASE_PATH, loadMeta } from "@/lib/game/data";
 import {
-  Badge, badges, dailyNumber, GameRecord, readProfile, summary, todaysDaily,
+  Badge, badges, dailyNumber, GameRecord, readProfile, summary, todayMelbourne, todaysDaily,
 } from "@/lib/game/profile";
+import { BoardEntry, fetchBoard, LEADERBOARD_URL } from "@/lib/game/leaderboard";
 import { Meta, Mode } from "@/lib/game/types";
 
 const MODES: { id: Mode; name: string; tag: string; desc: string }[] = [
@@ -48,6 +49,7 @@ export default function Home() {
   const [daily, setDaily] = useState<GameRecord | null>(null);
   const [prof, setProf] = useState<{ s: ReturnType<typeof summary>; b: Badge[] } | null>(null);
   const [oneClub, setOneClub] = useState("");
+  const [board, setBoard] = useState<{ daily: BoardEntry[]; alltime: BoardEntry[] } | null>(null);
   const [otd, setOtd] = useState<{ y: number; r: string; t1: string; s1: number; t2: string; s2: number } | null>(null);
 
   useEffect(() => {
@@ -67,6 +69,7 @@ export default function Home() {
       .then((r) => r.json())
       .then((d) => setOtd(d[key] ?? null))
       .catch(() => {});
+    fetchBoard(todayMelbourne()).then(setBoard).catch(() => {});
   }, []);
 
   const toggleEra = (d: number) => {
@@ -205,6 +208,39 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* global ladder — appears once the worker is live */}
+      {LEADERBOARD_URL && board && (board.daily.length > 0 || board.alltime.length > 0) && (
+        <section className="mt-8 grid gap-4 sm:grid-cols-2">
+          {([
+            [`Daily #${dailyNumber()} — world top 5`, board.daily],
+            ["All-time best seasons", board.alltime],
+          ] as [string, BoardEntry[]][]).map(([title, entries]) => (
+            <div key={title} className="rounded-2xl border border-line bg-pitch-light p-4">
+              <div className="flex items-baseline justify-between">
+                <h2 className="font-display text-lg font-black text-gold">{title}</h2>
+                <Link href="/ladder" className="text-xs text-ice hover:underline">full ladder →</Link>
+              </div>
+              <div className="mt-2 grid gap-1">
+                {entries.length === 0 && (
+                  <p className="py-2 text-center text-xs text-slate-500">no entries yet — be first</p>
+                )}
+                {entries.slice(0, 5).map((e, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg bg-pitch px-3 py-1 text-sm">
+                    <span className={`w-5 shrink-0 text-right font-display font-black ${i < 3 ? "text-gold" : "text-slate-500"}`}>
+                      {i + 1}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
+                      {e.n} {e.f && "🏆"}
+                    </span>
+                    <span className="shrink-0 font-display font-black text-grass">{e.w}-{e.l}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* one-club legends */}
       <section className="mt-8 rounded-2xl border border-line bg-pitch-light p-5">
