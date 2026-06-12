@@ -59,3 +59,45 @@ body {
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* tactile buttons everywhere */
+button:not(:disabled),
+a[class*="rounded-xl"] {
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease,
+    border-color 120ms ease;
+}
+button:not(:disabled):active,
+a[class*="rounded-xl"]:active {
+  transform: scale(0.97);
+}
+
+/* hero glow behind the big 23-0 */
+@keyframes heroPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+.hero-glow {
+  position: absolute;
+  inset: -40px -80px;
+  background: radial-gradient(closest-side, rgba(163, 230, 53, 0.18), transparent 70%);
+  filter: blur(8px);
+  animation: heroPulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* lift cards on hover (desktop) */
+@media (hover: hover) {
+  .lift {
+    transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease,
+      background-color 150ms ease;
+  }
+  .lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-glow { animation: none; }
+  .pop, .spinflash { animation: none; }
+}

@@ -1,0 +1,43 @@
+name: Weekly data refresh
+
+on:
+  schedule:
+    # Mondays 20:00 UTC — Tuesday ~6am Melbourne, after the weekend's footy
+    - cron: "0 20 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Re-scrape current decade and recompute
+        run: npm run refresh
+      - name: Commit refreshed data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pipeline/data.sqlite web/public/data
+          git diff --cached --quiet || git commit -m "Weekly data refresh ($(date -u +%Y-%m-%d))"
+          git push
+      # GITHUB_TOKEN pushes don't trigger other workflows, so deploy here too
+      - run: npm run build -w web
+      - name: Publish to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: web/out
+          force_orphan: true
+          cname: afl23-0.com

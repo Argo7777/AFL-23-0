@@ -1,6 +1,10 @@
 node_modules/
 pipeline/cache/
-pipeline/data.sqlite*
+# data.sqlite is committed so the weekly CI refresh can update in place
+pipeline/data.sqlite-journal
+pipeline/data.sqlite-wal
+pipeline/data.sqlite-shm
 web/.next/
 web/out/
 .DS_Store
+.playwright-mcp/

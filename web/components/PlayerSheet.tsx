@@ -56,8 +56,8 @@ export default function PlayerSheet({
         <div className="mt-3 grid grid-cols-4 gap-1 text-center text-[10px] uppercase tracking-wider text-slate-500">
           <span className="text-left">Season</span>
           <span>Games</span>
-          <span>{hasDi ? "Disposals" : "—"}</span>
-          <span>{hasBr ? "Votes" : "Goals"}</span>
+          <span>{hasDi ? "Disposals" : "Goals"}</span>
+          <span>{hasBr ? "Votes" : hasDi ? "Goals" : "—"}</span>
         </div>
         <div className="mt-1 grid gap-0.5">
           {(p.sea ?? []).map(([yr, gm, di, gl, br]) => (
@@ -65,7 +65,7 @@ export default function PlayerSheet({
               <span className="text-left font-display font-black text-slate-100">{yr}</span>
               <span>{gm}</span>
               <span>{hasDi ? (di ?? "—") : gl ?? "—"}</span>
-              <span>{hasBr ? (br ?? 0) : gl ?? "—"}</span>
+              <span>{hasBr ? (br ?? 0) : hasDi ? (gl ?? "—") : "—"}</span>
             </div>
           ))}
         </div>

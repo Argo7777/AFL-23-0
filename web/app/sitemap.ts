@@ -11,6 +11,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/battler/`, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/higher/`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${base}/greats/`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/awarded/`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/tips/`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/ladder/`, changeFrequency: "daily", priority: 0.6 },
     { url: `${base}/about/`, changeFrequency: "monthly", priority: 0.5 },
   ];
 }

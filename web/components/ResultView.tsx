@@ -1,13 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Mode, Pick } from "@/lib/game/types";
 import { FinalsOutcome, SeriesResult, SimResult } from "@/lib/game/sim";
 import { buildShareCard } from "@/lib/game/shareCard";
-import { Badge, dailyNumber } from "@/lib/game/profile";
+import { Badge, dailyNumber, todayMelbourne } from "@/lib/game/profile";
+import { coachName, LEADERBOARD_URL, setCoachName, submitScore } from "@/lib/game/leaderboard";
 import Confetti from "@/components/Confetti";
 import TeamField from "@/components/TeamField";
+
+/** count from 0 to the final record — the dopamine moment */
+function useCountUp(target: number, ms = 1100): number {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - t0) / ms);
+      setV(Math.round(target * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ms]);
+  return v;
+}
 
 const FINALS_LABELS: Record<FinalsOutcome, string> = {
   premiers: "Premiers",
@@ -50,8 +68,27 @@ export default function ResultView({
   const [copied, setCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [ladderName, setLadderName] = useState("");
+  const [ladderState, setLadderState] = useState<"idle" | "sending" | "done" | "failed">("idle");
+
+  useEffect(() => setLadderName(coachName()), []);
+
+  async function postToLadder() {
+    if (!ladderName.trim() || ladderState === "sending") return;
+    setLadderState("sending");
+    setCoachName(ladderName.trim());
+    const ok = await submitScore({
+      name: ladderName.trim(), wins: sim.wins, losses: sim.losses,
+      rating: Math.round(teamRating * 10) / 10,
+      flag: !spoon && sim.finals.modal === "premiers", mode,
+      ...(daily ? { daily: todayMelbourne() } : {}),
+    });
+    setLadderState(ok ? "done" : "failed");
+  }
   const picks = roster.filter((p): p is Pick => p !== null);
   const perfect = spoon ? sim.wins === 0 : sim.wins === 23;
+  const shownWins = useCountUp(sim.wins);
+  const shownLosses = useCountUp(sim.losses);
   const maxDist = Math.max(...sim.distribution);
 
   const targetWins = targetRecord ? Number(targetRecord.split("-")[0]) : null;
@@ -132,11 +169,11 @@ export default function ResultView({
           {daily ? `daily challenge #${dailyNumber()}` : spoon ? "the spoon chase" : "your season"}
         </p>
         <div
-          className={`font-display mt-2 text-6xl font-black sm:text-8xl ${
+          className={`font-display mt-2 text-6xl font-black tabular-nums sm:text-8xl ${
             perfect ? "text-grass" : sim.wins >= 18 ? "text-gold" : "text-slate-200"
           }`}
         >
-          {sim.wins}–{sim.losses}
+          {shownWins}–{shownLosses}
         </div>
         {!spoon && sim.finals.modal === "premiers" && (
           <div className="font-display mt-1 text-2xl font-black text-gold sm:text-3xl">
@@ -341,6 +378,32 @@ export default function ResultView({
           </div>
         </div>
       </div>
+
+      {LEADERBOARD_URL && mode !== "gauntlet" && !spoon && (
+        <div className="mx-auto mt-8 flex max-w-md items-center gap-2 rounded-2xl border border-line bg-pitch-light p-3">
+          {ladderState === "done" ? (
+            <p className="w-full text-center text-sm text-grass">
+              On the board! <Link href="/ladder" className="underline">See the global ladder →</Link>
+            </p>
+          ) : (
+            <>
+              <input
+                value={ladderName}
+                onChange={(e) => setLadderName(e.target.value.slice(0, 12))}
+                placeholder="Coach name"
+                className="w-full min-w-0 rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none placeholder:text-slate-600 focus:border-grass/60"
+              />
+              <button
+                onClick={postToLadder}
+                disabled={!ladderName.trim() || ladderState === "sending"}
+                className="shrink-0 rounded-xl bg-gold px-4 py-2 font-display text-sm font-black text-pitch disabled:opacity-50"
+              >
+                {ladderState === "sending" ? "…" : ladderState === "failed" ? "RETRY" : "POST TO GLOBAL LADDER"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
         <button

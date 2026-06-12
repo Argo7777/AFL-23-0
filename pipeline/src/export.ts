@@ -126,6 +126,63 @@ export function exportData() {
   }
   writeFileSync(join(OUT_DIR, "onthisday.json"), JSON.stringify(onThisDay));
 
+  // ---- award winners by year (for the Who Won It game) ----
+  const flipName = (n: string) => {
+    const i = n.indexOf(",");
+    return i === -1 ? n : `${n.slice(i + 1).trim()} ${n.slice(0, i).trim()}`;
+  };
+  const aaByYear: Record<string, string[]> = {};
+  for (const r of db.prepare(`SELECT year, player_name, pos FROM all_australian`).all() as
+    { year: number; player_name: string; pos: string | null }[]) {
+    if (r.pos === "SQUAD") continue;
+    (aaByYear[r.year] ??= []).push(r.player_name);
+  }
+  const brownlowByYear: Record<string, string> = {};
+  for (const r of db.prepare(`SELECT year, player_name FROM brownlow WHERE winner = 1`).all() as
+    { year: number; player_name: string }[]) {
+    brownlowByYear[r.year] = r.player_name;
+  }
+  // some footywire years lack the winner flag — fall back to the top of the tally
+  for (const r of db.prepare(
+    `SELECT year, player_name FROM brownlow a WHERE votes = (SELECT MAX(votes) FROM brownlow b WHERE b.year = a.year)`,
+  ).all() as { year: number; player_name: string }[]) {
+    brownlowByYear[r.year] ??= r.player_name;
+  }
+  for (const r of db.prepare(
+    `SELECT year, player_name FROM at_brownlow a WHERE votes = (SELECT MAX(votes) FROM at_brownlow b WHERE b.year = a.year)`,
+  ).all() as { year: number; player_name: string }[]) {
+    brownlowByYear[r.year] ??= flipName(r.player_name);
+  }
+  const colemanByYear: Record<string, string> = {};
+  for (const r of db.prepare(
+    `SELECT year, player_name FROM season_stats a WHERE gl IS NOT NULL AND gl = (SELECT MAX(gl) FROM season_stats b WHERE b.year = a.year)`,
+  ).all() as { year: number; player_name: string }[]) {
+    colemanByYear[r.year] = flipName(r.player_name);
+  }
+  writeFileSync(
+    join(OUT_DIR, "awards.json"),
+    JSON.stringify({ aa: aaByYear, brownlow: brownlowByYear, coleman: colemanByYear }),
+  );
+
+  // ---- tipping sample (real matches with strength-implied odds) ----
+  const strengthByClubYear = new Map<string, number>();
+  for (const s of strengths) strengthByClubYear.set(`${s.club}|${s.year}`, s.strength);
+  const allMatches = db
+    .prepare(`SELECT year, round, team1, score1, team2, score2 FROM matches WHERE year >= 1920 AND score1 != score2`)
+    .all() as { year: number; round: string; team1: string; score1: number; team2: string; score2: number }[];
+  const tips: [number, string, string, number, string, number, number][] = [];
+  for (let i = 0; i < allMatches.length; i += 4) {
+    const m = allMatches[i];
+    const s1 = strengthByClubYear.get(`${m.team1}|${m.year}`);
+    const s2 = strengthByClubYear.get(`${m.team2}|${m.year}`);
+    if (s1 == null || s2 == null) continue;
+    const p1 = (s1 * (1 - s2)) / (s1 * (1 - s2) + s2 * (1 - s1));
+    tips.push([
+      m.year, m.round, m.team1, m.score1, m.team2, m.score2, Math.round(p1 * 1000) / 1000,
+    ]);
+  }
+  writeFileSync(join(OUT_DIR, "tips.json"), JSON.stringify(tips));
+
   // ---- meta: which clubs exist per decade (from real fixtures) ----
   const clubsByDecade: Record<string, string[]> = {};
   for (const decade of decades) {

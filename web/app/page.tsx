@@ -87,8 +87,11 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
       <header className="text-center">
-        <div className="font-display text-7xl font-black tracking-tight text-grass">
-          23<span className="text-slate-500">–</span>0
+        <div className="relative inline-block">
+          <div className="hero-glow" aria-hidden />
+          <div className="font-display relative text-7xl font-black tracking-tight text-grass">
+            23<span className="text-slate-500">–</span>0
+          </div>
         </div>
         <p className="mt-1 text-sm uppercase tracking-[0.3em] text-slate-400">
           AFL all-era edition
@@ -258,7 +261,7 @@ export default function Home() {
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
         <Link
           href="/legend"
-          className="rounded-2xl border border-line bg-pitch-light p-5 transition hover:border-ice/50 hover:bg-card"
+          className="lift rounded-2xl border border-line bg-pitch-light p-5 hover:border-ice/50 hover:bg-card"
         >
           <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
             daily mystery · 6 guesses
@@ -272,7 +275,7 @@ export default function Home() {
         </Link>
         <Link
           href="/battler"
-          className="rounded-2xl border border-line bg-pitch-light p-5 transition hover:border-ice/50 hover:bg-card"
+          className="lift rounded-2xl border border-line bg-pitch-light p-5 hover:border-ice/50 hover:bg-card"
         >
           <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
             daily cult hero · 6 guesses
@@ -286,7 +289,7 @@ export default function Home() {
         </Link>
         <Link
           href="/higher"
-          className="rounded-2xl border border-line bg-pitch-light p-5 transition hover:border-ice/50 hover:bg-card"
+          className="lift rounded-2xl border border-line bg-pitch-light p-5 hover:border-ice/50 hover:bg-card"
         >
           <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
             endless streak
@@ -294,6 +297,42 @@ export default function Home() {
           <div className="font-display mt-1 text-2xl font-black">Higher or Lower</div>
           <p className="mt-2 text-sm text-slate-400">
             Two players, one stat — who averaged more? Real numbers, brutal streaks.
+          </p>
+        </Link>
+        <Link
+          href="/awarded"
+          className="lift rounded-2xl border border-line bg-pitch-light p-5 hover:border-ice/50 hover:bg-card"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            award trivia streak
+          </div>
+          <div className="font-display mt-1 text-2xl font-black">Who Won It?</div>
+          <p className="mt-2 text-sm text-slate-400">
+            Near-identical seasons, one Brownlow. Pick the winner from the stat lines.
+          </p>
+        </Link>
+        <Link
+          href="/tips"
+          className="lift rounded-2xl border border-line bg-pitch-light p-5 hover:border-ice/50 hover:bg-card"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            tip real history
+          </div>
+          <div className="font-display mt-1 text-2xl font-black">The Tipping Run</div>
+          <p className="mt-2 text-sm text-slate-400">
+            Real matches since 1920. Tip winners, ride the streak — underdogs pay double.
+          </p>
+        </Link>
+        <Link
+          href="/greats"
+          className="lift rounded-2xl border border-line bg-pitch-light p-5 hover:border-ice/50 hover:bg-card"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            the hall of fame
+          </div>
+          <div className="font-display mt-1 text-2xl font-black">The Greats</div>
+          <p className="mt-2 text-sm text-slate-400">
+            Every decade&apos;s top 25, by position and club. Settle the pub argument.
           </p>
         </Link>
       </section>

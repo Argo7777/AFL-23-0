@@ -1,0 +1,8 @@
+name = "afl230-leaderboard"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+# Run `npx wrangler kv namespace create BOARD` and paste the id below
+kv_namespaces = [
+  { binding = "BOARD", id = "PASTE_KV_NAMESPACE_ID_HERE" }
+]
