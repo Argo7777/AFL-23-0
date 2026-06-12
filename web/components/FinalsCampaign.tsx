@@ -43,6 +43,7 @@ export default function FinalsCampaign({
   const [status, setStatus] = useState<"idle" | "ready" | "swaps" | "out" | "champions">("idle");
   const [log, setLog] = useState<LogRow[]>([]);
   const [pendingInjury, setPendingInjury] = useState<number[]>([]); // roster indices to replace
+  const [injuredKeys, setInjuredKeys] = useState<Set<string>>(new Set()); // no miracle returns
   const [emergencyUsed, setEmergencyUsed] = useState(false);
   const [emergencyPool, setEmergencyPool] = useState<{ club: string; decade: number; players: PlayerEntry[] } | null>(null);
 
@@ -94,7 +95,12 @@ export default function FinalsCampaign({
     }
     if (injuredIdx.length) {
       const next = [...roster];
-      for (const i of injuredIdx) next[i] = null; // stretchered off
+      const hurt = new Set(injuredKeys);
+      for (const i of injuredIdx) {
+        hurt.add(next[i]!.player.id.split("|")[0]);
+        next[i] = null; // stretchered off
+      }
+      setInjuredKeys(hurt);
       setRoster(next);
       setPendingInjury(injuredIdx);
       setStage((s) => s + 1);
@@ -218,7 +224,10 @@ export default function FinalsCampaign({
               </p>
               <div className="mt-2 grid max-h-64 gap-1 overflow-y-auto">
                 {[...emergencyPool.players]
-                  .filter((p) => !usedKeys.has(p.id.split("|")[0]))
+                  .filter((p) => {
+                    const key = p.id.split("|")[0];
+                    return !usedKeys.has(key) && !injuredKeys.has(key);
+                  })
                   .sort(
                     (a, b) =>
                       scoreInSlot(b, instances[currentInjury].slot) -

@@ -147,7 +147,7 @@ export default function GauntletResult({
           {copied ? "COPIED!" : "SHARE THE RUN"}
         </button>
         <Link
-          href="/play?mode=gauntlet"
+          href={`/play?mode=gauntlet&r=${Date.now().toString(36)}`}
           className="rounded-xl border border-line px-8 py-3 font-display text-lg font-black text-slate-300 transition hover:border-grass/50"
         >
           RUN IT AGAIN

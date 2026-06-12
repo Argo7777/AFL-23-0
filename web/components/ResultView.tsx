@@ -502,7 +502,7 @@ export default function ResultView({
           {copied ? "COPIED!" : "COPY LINK"}
         </button>
         <Link
-          href={daily ? "/" : `/play?mode=${mode}&eras=${eras.join(",")}`}
+          href={daily ? "/" : `/play?mode=${mode}&eras=${eras.join(",")}&r=${Date.now().toString(36)}`}
           className="rounded-xl border border-line px-6 py-3 font-display text-lg font-black text-slate-300 transition hover:border-grass/50"
         >
           PLAY AGAIN

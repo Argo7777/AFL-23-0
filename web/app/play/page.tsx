@@ -804,10 +804,17 @@ function PlayInner() {
   );
 }
 
+/** remount the whole game when the query string changes — PLAY AGAIN from a
+ *  result navigates to the same route and must reset all state */
+function PlayKeyed() {
+  const params = useSearchParams();
+  return <PlayInner key={params.toString()} />;
+}
+
 export default function PlayPage() {
   return (
     <Suspense fallback={<main className="flex min-h-dvh items-center justify-center text-slate-400">loading…</main>}>
-      <PlayInner />
+      <PlayKeyed />
     </Suspense>
   );
 }

@@ -22,7 +22,3 @@ export const CULT_BOOST = 3;
 export function cultNickname(playerName: string): string | null {
   return CULT_HEROES[playerName.toLowerCase()] ?? null;
 }
-
-export function countCultHeroes(names: string[]): number {
-  return names.filter((n) => cultNickname(n)).length;
-}
