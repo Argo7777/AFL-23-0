@@ -347,10 +347,16 @@ export default function ResultView({
           {copied ? "COPIED!" : "COPY LINK"}
         </button>
         <Link
-          href="/"
+          href={daily ? "/" : `/play?mode=${mode}&eras=${eras.join(",")}`}
           className="rounded-xl border border-line px-6 py-3 font-display text-lg font-black text-slate-300 transition hover:border-grass/50"
         >
           PLAY AGAIN
+        </Link>
+        <Link
+          href="/"
+          className="rounded-xl border border-line px-6 py-3 font-display text-lg font-black text-slate-500 transition hover:border-grass/50"
+        >
+          HOME
         </Link>
       </div>
       <p className="mt-3 text-center text-xs text-slate-500">

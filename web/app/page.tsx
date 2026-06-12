@@ -78,6 +78,22 @@ export default function Home() {
         </p>
       </header>
 
+      {/* how it works */}
+      <section className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          ["🎰", "Spin", "a random club and decade"],
+          ["🧠", "Pick", "any player from that pool"],
+          ["🏉", "Place", "them on the oval — position matters"],
+          ["🏆", "Simulate", "a real season. Chase 23-0."],
+        ].map(([emoji, title, desc]) => (
+          <div key={title as string} className="rounded-xl border border-line bg-pitch-light p-3 text-center">
+            <div className="text-xl">{emoji}</div>
+            <div className="font-display text-sm font-black text-slate-100">{title}</div>
+            <div className="mt-0.5 text-[11px] leading-tight text-slate-500">{desc}</div>
+          </div>
+        ))}
+      </section>
+
       {/* daily challenge */}
       <section className="mt-8 rounded-2xl border border-gold/60 bg-card p-5 shadow-[0_0_24px_-8px] shadow-gold/40">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -166,7 +182,7 @@ export default function Home() {
       </section>
 
       {/* more games */}
-      <section className="mt-8 grid gap-4 sm:grid-cols-2">
+      <section className="mt-8 grid gap-4 sm:grid-cols-3">
         <Link
           href="/legend"
           className="rounded-2xl border border-line bg-pitch-light p-5 transition hover:border-ice/50 hover:bg-card"
@@ -179,6 +195,20 @@ export default function Home() {
           </div>
           <p className="mt-2 text-sm text-slate-400">
             One mystery great per day. Every miss unlocks a clue — era, stats, honours, clubs.
+          </p>
+        </Link>
+        <Link
+          href="/battler"
+          className="rounded-2xl border border-line bg-pitch-light p-5 transition hover:border-ice/50 hover:bg-card"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ice">
+            daily cult hero · 6 guesses
+          </div>
+          <div className="font-display mt-1 text-2xl font-black">
+            Guess the Battler <span className="text-ice">#{dailyNumber()}</span>
+          </div>
+          <p className="mt-2 text-sm text-slate-400">
+            No superstars — name the honest toiler. Only real fans survive this one.
           </p>
         </Link>
         <Link
@@ -235,6 +265,10 @@ export default function Home() {
             {meta.decades.length} decades · data generated{" "}
             {new Date(meta.generatedAt).toLocaleDateString()} from{" "}
             {meta.sources.join(", ")} ·{" "}
+            <Link href="/greats" className="text-slate-400 underline hover:text-ice">
+              the greats
+            </Link>{" "}
+            ·{" "}
             <Link href="/about" className="text-slate-400 underline hover:text-ice">
               about the numbers
             </Link>

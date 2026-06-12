@@ -46,9 +46,52 @@ const sections: { h: string; body: string[] }[] = [
   },
 ];
 
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "How are AFL players rated in 23-0?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Every player is rated within their own decade against their peers, using era-relative per-game statistics scraped from afltables.com plus real honours from footywire.com: Brownlow votes, All-Australian selections, premierships from actual Grand Final lineups, and leading goalkicker titles. Each decade is calibrated to the same scale so eras compete fairly.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Is it possible to go 23-0?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Barely. Seasons are simulated against the real teams of your chosen eras, the fixture leans toward quality opponents, and no side escapes the chance of an upset. Even the greatest team ever assembled almost never gets through untouched — that's the chase.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Where do the player salaries come from?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "No public dataset of historical AFL salaries exists, so prices are derived transparently from the data: a blend of on-field rating and fame (honours), mapped onto a realistic modern pay scale. Decorated superstars price at the top; under-decorated stat machines are bargains.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Is AFL 23-0 free?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes — every mode, the daily challenges and the trivia games are free to play in any browser, with no account needed.",
+      },
+    },
+  ],
+};
+
 export default function About() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
       <h1 className="font-display mt-6 text-4xl font-black">About the numbers</h1>
       {sections.map((s) => (

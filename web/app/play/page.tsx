@@ -68,6 +68,11 @@ function PlayInner() {
   const [capSort, setCapSort] = useState<"desc" | "asc" | "afford">("desc");
   const [pendingPlayer, setPendingPlayer] = useState<PlayerEntry | null>(null);
   const [fieldSel, setFieldSel] = useState<number | null>(null);
+  const [undoSnap, setUndoSnap] = useState<{
+    roster: (Pick | null)[];
+    combo: Combo;
+    pool: PlayerEntry[];
+  } | null>(null);
   const [swapIndex, setSwapIndex] = useState<number | null>(null);
   const [swapPool, setSwapPool] = useState<PlayerEntry[]>([]);
   const [sim, setSim] = useState<SimResult | null>(null);
@@ -220,6 +225,7 @@ function PlayInner() {
     if (!combo) return;
     const idx = instances.findIndex((s, i) => s.slot === slotType && roster[i] === null);
     if (idx === -1) return;
+    setUndoSnap({ roster, combo, pool }); // one step back, until the next pick
     const next = [...roster];
     next[idx] = {
       player, decade: combo.decade, club: combo.club, slot: slotType,
@@ -229,6 +235,19 @@ function PlayInner() {
     setPendingPlayer(null);
     if (next.every(Boolean)) setPhase("review");
     else rollCombo();
+  }
+
+  /** take back the last pick and return to its pool — once per pick */
+  function undoLastPick() {
+    if (!undoSnap) return;
+    setRoster(undoSnap.roster);
+    setCombo(undoSnap.combo);
+    setPool(undoSnap.pool);
+    setUndoSnap(null);
+    setPendingPlayer(null);
+    setFieldSel(null);
+    setSearch("");
+    setPhase("pick");
   }
 
   function confirmLifelineSwap(player: PlayerEntry) {
@@ -379,6 +398,14 @@ function PlayInner() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
         <div className="flex items-center gap-4 text-xs text-slate-400">
+          {undoSnap && phase !== "result" && !inSwap && (
+            <button
+              onClick={undoLastPick}
+              className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-hot/60 hover:text-hot"
+            >
+              ↩ UNDO PICK
+            </button>
+          )}
           {phase !== "review" && (
             <span>Pick <b className="text-slate-100">{Math.min(pickCount + 1, totalPicks)}</b>/{totalPicks}</span>
           )}
@@ -642,6 +669,11 @@ function PlayInner() {
                     }`}>
                       {score.toFixed(0)}
                     </div>
+                    {totalPicks > 5 && (
+                      <div className="text-[9px] text-slate-500">
+                        {slotsLeft[s]} open
+                      </div>
+                    )}
                     {s === "UTL" && pendingPlayer.u > 1 && (
                       <div className="text-[9px] text-ice">×{pendingPlayer.u.toFixed(2)}</div>
                     )}
