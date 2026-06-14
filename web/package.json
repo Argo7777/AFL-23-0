@@ -18,5 +18,14 @@
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0"
-  }
+  },
+  "//browserslist": "Modern targets only — drops Next's legacy polyfill bundle (Promise/fetch/URL/Symbol etc.) that every supported browser already ships natively, trimming ~38KB gz of JS off every page.",
+  "browserslist": [
+    "chrome >= 87",
+    "edge >= 88",
+    "firefox >= 78",
+    "safari >= 14",
+    "not dead",
+    "not op_mini all"
+  ]
 }

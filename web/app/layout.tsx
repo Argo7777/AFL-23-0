@@ -71,6 +71,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-AU">
       <head>
+        {/* warm up the DNS/TLS handshakes for the async third parties so ads
+            and analytics don't add round-trips to the critical path */}
+        <link rel="preconnect" href="https://pagead2.googlesyndication.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://googleads.g.doubleclick.net" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://static.cloudflareinsights.com" />
         {/* Google AdSense — in <head> so the AdSense crawler verifies the site
             and page-level / Auto ads can run. */}
         <script
