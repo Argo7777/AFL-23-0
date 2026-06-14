@@ -46,8 +46,28 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
   const hasDi = sea.some((s) => s[2] != null);
   const [c1, c2] = clubColors(clubs[0] ?? "");
 
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      name: c.name,
+      jobTitle: "Australian rules footballer",
+      memberOf: clubs.map((club) => ({ "@type": "SportsTeam", name: club })),
+      url: `https://afl23-0.com/player/${c.slug}`,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Players", item: "https://afl23-0.com/greats" },
+        { "@type": "ListItem", position: 2, name: c.name, item: `https://afl23-0.com/player/${c.slug}` },
+      ],
+    },
+  ];
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
 
       <div className="mt-5 flex items-center gap-3">

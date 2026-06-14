@@ -31,9 +31,28 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
 
   const [c1, c2] = clubColors(c.name);
   const POS: Record<string, string> = { DEF: "defenders", MID: "midfielders", RUC: "rucks", FWD: "forwards" };
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "SportsTeam",
+      name: c.name,
+      sport: "Australian rules football",
+      url: `https://afl23-0.com/club/${c.slug}`,
+      ...(c.flags.length ? { award: `${c.flags.length} VFL/AFL premierships` } : {}),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Clubs", item: "https://afl23-0.com/clubs" },
+        { "@type": "ListItem", position: 2, name: c.name, item: `https://afl23-0.com/club/${c.slug}` },
+      ],
+    },
+  ];
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-4 shrink-0 flex-col overflow-hidden rounded-sm">
           <span className="flex-1" style={{ background: c1 }} />

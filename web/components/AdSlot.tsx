@@ -36,7 +36,9 @@ export default function AdSlot({
   if (!ADSENSE_CLIENT || !slot) return null;
 
   return (
-    <div className={`mx-auto w-full max-w-3xl ${className}`}>
+    // reserve a little space so a filled ad doesn't shove content down
+    // (Cumulative Layout Shift is a Core Web Vital and a ranking signal)
+    <div className={`mx-auto w-full max-w-3xl ${className}`} style={{ minHeight: 100 }}>
       {label && (
         <p className="mb-1 text-center text-[9px] uppercase tracking-widest text-slate-700">
           advertisement
@@ -44,7 +46,7 @@ export default function AdSlot({
       )}
       <ins
         className="adsbygoogle"
-        style={{ display: "block" }}
+        style={{ display: "block", minHeight: 90 }}
         data-ad-client={ADSENSE_CLIENT}
         data-ad-slot={slot}
         data-ad-format="auto"
