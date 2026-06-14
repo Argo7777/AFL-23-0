@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { loadMeta, loadPool } from "@/lib/game/data";
+import { eraLabel, getComp, loadMeta, loadPool } from "@/lib/game/data";
 import { clubColors } from "@/lib/game/clubColors";
 import { Meta, PlayerEntry, Slot, scoreInSlot } from "@/lib/game/types";
 
@@ -89,7 +89,7 @@ export default function QuickDraft({
         <div>
           <p className="text-[10px] uppercase tracking-widest text-slate-500">{prompt}</p>
           <p className="font-display text-xl font-black">
-            {combo.club} <span className="text-gold">{combo.decade}s</span>
+            {combo.club} <span className="text-gold">{eraLabel(combo.decade, getComp())}</span>
           </p>
         </div>
         <span className="flex h-1.5 w-16 overflow-hidden rounded-full">

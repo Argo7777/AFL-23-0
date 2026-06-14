@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { loadDecade, loadMeta } from "@/lib/game/data";
+import { eraLabel, loadDecade, loadMeta, setComp, type Comp } from "@/lib/game/data";
+import { compFromUrl } from "@/lib/game/useComp";
 import { clubColors } from "@/lib/game/clubColors";
 import { dailyNumber, dailySeed } from "@/lib/game/profile";
 import { mulberry32 } from "@/lib/game/rng";
@@ -19,7 +20,8 @@ export interface GuessConfig {
   storageKey: string;
   seedXor: number;
   decadeMin: number;
-  pick: (p: PlayerEntry) => boolean; // candidate filter
+  pick: (p: PlayerEntry) => boolean; // candidate filter (AFL)
+  pickAflw?: (p: PlayerEntry) => boolean; // AFLW candidate filter (fewer games/season)
   shareLabel: string; // "Legend"
   path: string; // "/legend/"
   revealLine: (won: boolean) => [string, string]; // [won text, lost text] header
@@ -42,6 +44,7 @@ function todayKey(): string {
 }
 
 export default function GuessGame({ cfg }: { cfg: GuessConfig }) {
+  const [comp, setCompState] = useState<Comp>("afl");
   const [answer, setAnswer] = useState<PlayerEntry | null>(null);
   const [decade, setDecade] = useState(0);
   const [names, setNames] = useState<string[]>([]);
@@ -50,20 +53,28 @@ export default function GuessGame({ cfg }: { cfg: GuessConfig }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
+  const storeKey = `${cfg.storageKey}-${comp}`;
+  const homeHref = comp === "aflw" ? "/aflw" : "/";
+
   useEffect(() => {
     (async () => {
+      const c = compFromUrl();
+      setComp(c);
+      setCompState(c);
       const meta = await loadMeta();
-      const rng = mulberry32(dailySeed() ^ cfg.seedXor);
-      const eligible = meta.decades.filter((d) => d >= cfg.decadeMin);
+      const rng = mulberry32(dailySeed() ^ cfg.seedXor ^ (c === "aflw" ? 0xa1f : 0));
+      // AFLW has only a handful of seasons; use them all
+      const eligible = c === "aflw" ? meta.decades : meta.decades.filter((d) => d >= cfg.decadeMin);
       const d = eligible[Math.floor(rng() * eligible.length)];
       const pool = await loadDecade(d);
-      const candidates = pool.filter(cfg.pick);
+      const filt = c === "aflw" && cfg.pickAflw ? cfg.pickAflw : cfg.pick;
+      const candidates = pool.filter(filt);
       const pickP = candidates[Math.floor(rng() * Math.max(1, candidates.length))] ?? pool[0];
       setAnswer(pickP);
       setDecade(d);
       setNames([...new Set(pool.map((p) => p.n))].sort());
       try {
-        const saved = JSON.parse(localStorage.getItem(cfg.storageKey) ?? "") as SavedState;
+        const saved = JSON.parse(localStorage.getItem(`${cfg.storageKey}-${c}`) ?? "") as SavedState;
         if (saved.date === todayKey()) setState(saved);
       } catch { /* fresh day */ }
     })();
@@ -72,7 +83,7 @@ export default function GuessGame({ cfg }: { cfg: GuessConfig }) {
 
   const save = (s: SavedState) => {
     setState(s);
-    try { localStorage.setItem(cfg.storageKey, JSON.stringify(s)); } catch { /* ignore */ }
+    try { localStorage.setItem(storeKey, JSON.stringify(s)); } catch { /* ignore */ }
   };
 
   const clues = useMemo(() => {
@@ -85,14 +96,14 @@ export default function GuessGame({ cfg }: { cfg: GuessConfig }) {
     ].filter(Boolean).join(", ");
     const hon = honours(answer);
     return [
-      `Played in the ${decade}s as a ${answer.nat}`,
-      `${answer.g} games that decade${answer.h ? ` · ${answer.h}cm` : ""} · career ${answer.y[0]}–${answer.y[1]}`,
+      `Played in ${eraLabel(decade, comp)} as a ${answer.nat}`,
+      `${answer.g} games ${comp === "aflw" ? "that season" : "that decade"}${answer.h ? ` · ${answer.h}cm` : ""} · career ${answer.y[0]}–${answer.y[1]}`,
       stat ? `Per game: ${stat}` : "A stats sheet from a simpler era — judged on goals and games",
       hon.length ? `Honours: ${hon.join(", ")}` : "No major silverware — respect the toil",
       `Club${Object.keys(answer.c).length > 1 ? "s" : ""}: ${Object.keys(answer.c).join(", ")}`,
       `Initials: ${answer.n.split(" ").map((w) => w[0]).join(".")}.`,
     ];
-  }, [answer, decade]);
+  }, [answer, decade, comp]);
 
   if (!answer) {
     return <main className="flex min-h-dvh items-center justify-center text-slate-400">finding today&apos;s player…</main>;
@@ -114,18 +125,20 @@ export default function GuessGame({ cfg }: { cfg: GuessConfig }) {
     setGuess("");
   }
 
-  const shareText = `AFL 23-0 ${cfg.shareLabel} #${dailyNumber()}: ${
+  const brand = comp === "aflw" ? "AFLW 23-0" : "AFL 23-0";
+  const sharePath = comp === "aflw" ? `${cfg.path}?comp=aflw` : cfg.path;
+  const shareText = `${brand} ${cfg.shareLabel} #${dailyNumber()}: ${
     state.won ? `✅ got it in ${state.guesses.length}/${MAX_GUESSES}` : `❌ stumped (${MAX_GUESSES}/${MAX_GUESSES})`
-  }\n${"🟥".repeat(state.won ? state.guesses.length - 1 : MAX_GUESSES)}${state.won ? "🟩" : ""}\nhttps://afl23-0.com${cfg.path}`;
+  }\n${"🟥".repeat(state.won ? state.guesses.length - 1 : MAX_GUESSES)}${state.won ? "🟩" : ""}\nhttps://afl23-0.com${sharePath}`;
 
   const [wonText, lostText] = cfg.revealLine(state.won);
 
   return (
     <main className="mx-auto max-w-xl px-4 py-8">
       {state.done && state.won && <Confetti />}
-      <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
+      <span className="flex items-center gap-2"><Link href={homeHref} className="font-display text-2xl font-black text-grass">23–0</Link><Link href={homeHref} className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 {comp === "aflw" ? "AFLW" : "HOME"}</Link></span>
       <h1 className="font-display mt-4 text-3xl font-black">
-        {cfg.title} <span className={cfg.accent}>#{dailyNumber()}</span>
+        {comp === "aflw" ? "AFLW " : ""}{cfg.title} <span className={cfg.accent}>#{dailyNumber()}</span>
       </h1>
       <p className="mt-1 text-sm text-slate-400">{cfg.tagline}</p>
 
@@ -182,7 +195,7 @@ export default function GuessGame({ cfg }: { cfg: GuessConfig }) {
               <span className="flex-1" style={{ background: clubColors(Object.keys(answer.c)[0])[0] }} />
               <span className="flex-1" style={{ background: clubColors(Object.keys(answer.c)[0])[1] }} />
             </span>
-            {Object.keys(answer.c).join(", ")} · {decade}s · rating{" "}
+            {Object.keys(answer.c).join(", ")} · {eraLabel(decade, comp)} · rating{" "}
             {Math.round(Math.max(answer.r.DEF, answer.r.MID, answer.r.RUC, answer.r.FWD))}
           </div>
           <div className="mt-4 flex flex-wrap justify-center gap-3">
@@ -196,7 +209,7 @@ export default function GuessGame({ cfg }: { cfg: GuessConfig }) {
             >
               {copied ? "COPIED!" : "SHARE RESULT"}
             </button>
-            <Link href="/" className="rounded-xl border border-line px-7 py-2.5 font-display text-base font-black text-slate-300 hover:border-grass/50">
+            <Link href={homeHref} className="rounded-xl border border-line px-7 py-2.5 font-display text-base font-black text-slate-300 hover:border-grass/50">
               MORE GAMES
             </Link>
           </div>

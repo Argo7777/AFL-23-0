@@ -344,6 +344,25 @@ export function exportData() {
       for (const y of Object.keys(aflwStrengths)) aflwStrengths[y].sort((a, b) => a[0] - b[0]);
       writeFileSync(join(OUT_DIR, "aflw-strengths.json"), JSON.stringify(aflwStrengths));
 
+      // AFLW tipping sample: real matches with strength-implied odds (for /tips)
+      const strByTeam = new Map<string, number>();
+      for (const key of seasonKeys) {
+        for (const r of aflwLadders[key]) {
+          if (r.p === 0) continue;
+          strByTeam.set(`${key}|${r.team}`, Math.min(0.95, Math.max(0.05, (r.w + 0.5 * r.d) / r.p)));
+        }
+      }
+      const aflwTips: [string, string, string, number, string, number, number][] = [];
+      for (const m of aflwRows) {
+        if (m.score1 === m.score2) continue;
+        const s1 = strByTeam.get(`${m.season_key}|${m.team1}`);
+        const s2 = strByTeam.get(`${m.season_key}|${m.team2}`);
+        if (s1 == null || s2 == null) continue;
+        const p1 = (s1 * (1 - s2)) / (s1 * (1 - s2) + s2 * (1 - s1));
+        aflwTips.push([m.label, m.round, m.team1, m.score1, m.team2, m.score2, Math.round(p1 * 1000) / 1000]);
+      }
+      writeFileSync(join(OUT_DIR, "aflw-tips.json"), JSON.stringify(aflwTips));
+
       const capByYear: Record<string, number> = {};
       for (const y of aflwPlayers.years) capByYear[y] = 21_200_000;
       writeFileSync(

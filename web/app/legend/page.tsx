@@ -13,6 +13,7 @@ export default function LegendPage() {
         seedXor: 0x1e9e,
         decadeMin: 1950,
         pick: (p) => Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD) >= 90 && p.g >= 50,
+        pickAflw: (p) => Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD) >= 90 && p.g >= 8,
         shareLabel: "Legend",
         path: "/legend/",
         revealLine: () => ["legend identified", "today's legend was"],

@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { BASE_PATH } from "@/lib/game/data";
+import { BASE_PATH, type Comp } from "@/lib/game/data";
+import { compFromUrl } from "@/lib/game/useComp";
 import { clubColors } from "@/lib/game/clubColors";
 
-const BEST_KEY = "afl230-tips-best";
-
-/** [year, round, team1, score1, team2, score2, p(team1 wins)] */
-type Tip = [number, string, string, number, string, number, number];
+/** [year/label, round, team1, score1, team2, score2, p(team1 wins)] */
+type Tip = [string | number, string, string, number, string, number, number];
 
 const toOdds = (p: number) => Math.max(1.01, Math.min(15, 0.95 / p)).toFixed(2);
 
@@ -22,10 +21,16 @@ export default function TipsPage() {
   const [over, setOver] = useState(false);
   const [copied, setCopied] = useState(false);
   const busy = useRef(false);
+  const [comp, setCompState] = useState<Comp>("afl");
+  const bestKey = `afl230-tips-best-${comp}`;
+  const homeHref = comp === "aflw" ? "/aflw" : "/";
 
   useEffect(() => {
-    fetch(`${BASE_PATH}/data/tips.json`).then((r) => r.json()).then(setTips);
-    setBest(Number(localStorage.getItem(BEST_KEY) ?? 0));
+    const c = compFromUrl();
+    setCompState(c);
+    const file = c === "aflw" ? "aflw-tips.json" : "tips.json";
+    fetch(`${BASE_PATH}/data/${file}`).then((r) => r.json()).then(setTips);
+    setBest(Number(localStorage.getItem(`afl230-tips-best-${c}`) ?? 0));
   }, []);
 
   const next = useCallback(() => {
@@ -55,7 +60,7 @@ export default function TipsPage() {
         const finalBank = bank;
         if (finalBank > best) {
           setBest(finalBank);
-          localStorage.setItem(BEST_KEY, String(finalBank));
+          localStorage.setItem(bestKey, String(finalBank));
         }
         setOver(true);
       }
@@ -109,7 +114,7 @@ export default function TipsPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <div className="flex items-center justify-between">
-        <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
+        <span className="flex items-center gap-2"><Link href={homeHref} className="font-display text-2xl font-black text-grass">23–0</Link><Link href={homeHref} className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 {comp === "aflw" ? "AFLW" : "HOME"}</Link></span>
         <div className="text-sm text-slate-400">
           Points <b className="font-display text-xl text-grass">{bank}</b>
           <span className="mx-2 text-slate-600">·</span>
@@ -150,7 +155,7 @@ export default function TipsPage() {
             <button
               onClick={async () => {
                 await navigator.clipboard.writeText(
-                  `I banked ${bank} points tipping real footy history on AFL 23-0 🎯 Beat my run: https://afl23-0.com/tips/`,
+                  `I banked ${bank} points tipping real ${comp === "aflw" ? "AFLW" : "footy"} history on AFL 23-0 🎯 Beat my run: https://afl23-0.com/tips/${comp === "aflw" ? "?comp=aflw" : ""}`,
                 );
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);

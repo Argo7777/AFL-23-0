@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import QuickDraft, { QuickPick } from "@/components/QuickDraft";
 import Confetti from "@/components/Confetti";
-import { loadMeta, loadPool } from "@/lib/game/data";
+import { eraLabel, loadMeta, loadPool, setComp } from "@/lib/game/data";
+import { compFromUrl } from "@/lib/game/useComp";
 import { quickSeason, QuickSeasonResult } from "@/lib/game/quickSim";
 import { Slot, scoreInSlot } from "@/lib/game/types";
 
@@ -23,6 +24,8 @@ interface SeasonRow extends QuickSeasonResult {
 }
 
 export default function RebuildPage() {
+  const comp = useMemo(() => { const c = compFromUrl(); setComp(c); return c; }, []);
+  const homeHref = comp === "aflw" ? "/aflw" : "/";
   const [roster, setRoster] = useState<Record<Slot, RosterSpot> | null>(null);
   const [seasons, setSeasons] = useState<SeasonRow[]>([]);
   const [phase, setPhase] = useState<"loading" | "trade" | "slotpick" | "simming" | "won">("loading");
@@ -90,7 +93,7 @@ export default function RebuildPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
+      <span className="flex items-center gap-2"><Link href={homeHref} className="font-display text-2xl font-black text-grass">23–0</Link><Link href={homeHref} className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 {comp === "aflw" ? "AFLW" : "HOME"}</Link></span>
       <h1 className="font-display mt-4 text-3xl font-black">The Rebuild</h1>
       <p className="mt-1 text-sm text-slate-400">
         You inherit a shocker. One trade per season — climb from basket case to premiers
@@ -107,7 +110,7 @@ export default function RebuildPage() {
             <div key={s} className="flex items-center gap-2 rounded bg-pitch px-2.5 py-1 text-sm">
               <span className="w-9 shrink-0 font-display font-black text-ice">{s}</span>
               <span className="min-w-0 flex-1 truncate text-slate-200">{roster[s].name}</span>
-              <span className="shrink-0 text-xs text-slate-500">{roster[s].club} {roster[s].decade}s</span>
+              <span className="shrink-0 text-xs text-slate-500">{roster[s].club} {eraLabel(roster[s].decade, comp)}</span>
               <span className="shrink-0 font-display font-black text-grass">{Math.round(roster[s].score)}</span>
             </div>
           ))}
@@ -139,7 +142,7 @@ export default function RebuildPage() {
             <button
               onClick={async () => {
                 await navigator.clipboard.writeText(
-                  `I rebuilt a basket-case footy club into premiers in ${seasons.length} seasons on AFL 23-0 🔨🏆 https://afl23-0.com/rebuild/`,
+                  `I rebuilt a basket-case ${comp === "aflw" ? "AFLW" : "footy"} club into premiers in ${seasons.length} seasons on AFL 23-0 🔨🏆 https://afl23-0.com/rebuild/${comp === "aflw" ? "?comp=aflw" : ""}`,
                 );
               }}
               className="rounded-xl bg-grass px-7 py-2.5 font-display text-base font-black text-pitch hover:bg-lime-300"

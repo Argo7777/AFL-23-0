@@ -104,6 +104,31 @@ export default function AflwHub() {
         </div>
       </section>
 
+      {/* daily & arcade games, in AFLW */}
+      <section className="mt-8">
+        <h2 className="font-display text-sm font-black uppercase tracking-wide text-[#ff8d79]">Daily &amp; arcade · AFLW</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {[
+            ["/legend?comp=aflw", "Guess the Legend", "A mystery AFLW great per day — six clues."],
+            ["/battler?comp=aflw", "Guess the Battler", "Name the honest AFLW toiler. Real fans only."],
+            ["/higher?comp=aflw", "Higher or Lower", "Two AFLW players, one stat — pick the bigger number."],
+            ["/tips?comp=aflw", "The Tipping Run", "Tip real AFLW results — underdogs pay double."],
+            ["/dynasty?comp=aflw", "Dynasty", "Coach an AFLW era — your stars age and retire."],
+            ["/rebuild?comp=aflw", "The Rebuild", "Drag an AFLW basket case to a flag, one trade a year."],
+            ["/duel?comp=aflw", "Draft Duel", "Two coaches, one phone — alternating AFLW spins."],
+          ].map(([href, name, desc]) => (
+            <Link
+              key={href}
+              href={href}
+              className="rounded-2xl border border-line bg-pitch-light p-4 transition hover:border-[#ff5e44]/50 hover:bg-card"
+            >
+              <div className="font-display text-lg font-black text-slate-100">{name}</div>
+              <p className="mt-1 text-sm text-slate-400">{desc}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <AdSlot slot={AD_SLOTS.content} className="mt-6" />
 
       <div className="mt-8 flex flex-wrap gap-2 text-sm">

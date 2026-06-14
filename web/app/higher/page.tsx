@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { loadDecade, loadMeta } from "@/lib/game/data";
+import { eraLabel, loadDecade, loadMeta, setComp, type Comp } from "@/lib/game/data";
+import { compFromUrl } from "@/lib/game/useComp";
 import { clubColors } from "@/lib/game/clubColors";
 import { PlayerEntry } from "@/lib/game/types";
-
-const BEST_KEY = "afl230-higher-best";
 
 interface Question {
   decade: number;
@@ -28,6 +27,7 @@ const STATS: { key: string; label: string; get: (p: PlayerEntry) => number | nul
 ];
 
 export default function HigherPage() {
+  const [comp, setCompState] = useState<Comp>("afl");
   const [decades, setDecades] = useState<number[]>([]);
   const [q, setQ] = useState<Question | null>(null);
   const [reveal, setReveal] = useState<"a" | "b" | null>(null); // chosen card
@@ -36,15 +36,20 @@ export default function HigherPage() {
   const [over, setOver] = useState(false);
   const [copied, setCopied] = useState(false);
   const busy = useRef(false);
+  const bestKey = `afl230-higher-best-${comp}`;
+  const homeHref = comp === "aflw" ? "/aflw" : "/";
 
   useEffect(() => {
-    loadMeta().then((m) => setDecades(m.decades.filter((d) => d >= 1970)));
-    setBest(Number(localStorage.getItem(BEST_KEY) ?? 0));
+    const c = compFromUrl();
+    setComp(c);
+    setCompState(c);
+    loadMeta().then((m) => setDecades(c === "aflw" ? m.decades : m.decades.filter((d) => d >= 1970)));
+    setBest(Number(localStorage.getItem(`afl230-higher-best-${c}`) ?? 0));
   }, []);
 
   const nextQuestion = useCallback(async (): Promise<void> => {
     const d = decades[Math.floor(Math.random() * decades.length)];
-    const pool = (await loadDecade(d)).filter((p) => p.g >= 45);
+    const pool = (await loadDecade(d)).filter((p) => p.g >= (comp === "aflw" ? 5 : 45));
     for (let attempt = 0; attempt < 60; attempt++) {
       const a = pool[Math.floor(Math.random() * pool.length)];
       const b = pool[Math.floor(Math.random() * pool.length)];
@@ -60,7 +65,7 @@ export default function HigherPage() {
       return;
     }
     return nextQuestion();
-  }, [decades]);
+  }, [decades, comp]);
 
   useEffect(() => {
     if (decades.length && !q) nextQuestion();
@@ -80,7 +85,7 @@ export default function HigherPage() {
         const finalStreak = streak;
         if (finalStreak > best) {
           setBest(finalStreak);
-          localStorage.setItem(BEST_KEY, String(finalStreak));
+          localStorage.setItem(bestKey, String(finalStreak));
         }
         setOver(true);
       }
@@ -121,7 +126,7 @@ export default function HigherPage() {
         </div>
         <div className="font-display mt-3 text-2xl font-black leading-tight">{p.n}</div>
         <div className="mt-1 text-xs text-slate-400">
-          {Object.keys(p.c)[0]} · {q.decade}s · {p.nat}
+          {Object.keys(p.c)[0]} · {eraLabel(q.decade, comp)} · {p.nat}
         </div>
         <div className={`font-display mt-4 text-4xl font-black ${reveal ? (isWinner ? "text-grass" : "text-hot") : "text-slate-600"}`}>
           {reveal ? q.fmt(v) : "?"}
@@ -133,7 +138,7 @@ export default function HigherPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <div className="flex items-center justify-between">
-        <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
+        <span className="flex items-center gap-2"><Link href={homeHref} className="font-display text-2xl font-black text-grass">23–0</Link><Link href={homeHref} className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 {comp === "aflw" ? "AFLW" : "HOME"}</Link></span>
         <div className="text-sm text-slate-400">
           Streak <b className="font-display text-xl text-grass">{streak}</b>
           <span className="mx-2 text-slate-600">·</span>
@@ -146,7 +151,7 @@ export default function HigherPage() {
           <h1 className="font-display mt-6 text-center text-2xl font-black sm:text-3xl">
             Who <span className="text-gold">{q.label}</span>?
           </h1>
-          <p className="mt-1 text-center text-xs text-slate-500">both from the {q.decade}s — tap your pick</p>
+          <p className="mt-1 text-center text-xs text-slate-500">both from {eraLabel(q.decade, comp)} — tap your pick</p>
           <div className="mt-6 flex flex-col gap-4 sm:flex-row">
             <Card side="a" />
             <Card side="b" />
@@ -169,7 +174,7 @@ export default function HigherPage() {
             <button
               onClick={async () => {
                 await navigator.clipboard.writeText(
-                  `I hit a streak of ${streak} on AFL Higher or Lower 📊 Beat it: https://afl23-0.com/higher/`,
+                  `I hit a streak of ${streak} on ${comp === "aflw" ? "AFLW" : "AFL"} Higher or Lower 📊 Beat it: https://afl23-0.com/higher/${comp === "aflw" ? "?comp=aflw" : ""}`,
                 );
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);

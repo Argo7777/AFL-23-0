@@ -17,6 +17,10 @@ export default function BattlerPage() {
           const best = Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD);
           return best >= 55 && best <= 82 && p.g >= 80;
         },
+        pickAflw: (p) => {
+          const best = Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD);
+          return best >= 50 && best <= 80 && p.g >= 6;
+        },
         shareLabel: "Battler",
         path: "/battler/",
         revealLine: () => ["you know your footy", "today's battler was"],

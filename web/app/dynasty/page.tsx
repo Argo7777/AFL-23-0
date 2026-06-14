@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { setComp } from "@/lib/game/data";
+import { compFromUrl } from "@/lib/game/useComp";
 import QuickDraft, { bestOpenSlot, QuickPick } from "@/components/QuickDraft";
 import Confetti from "@/components/Confetti";
 import { playerAge } from "@/lib/game/finals";
@@ -32,6 +34,9 @@ const currentScore = (p: DynastyPlayer, seasonsPlayed: number) =>
 const currentAge = (p: DynastyPlayer, seasonsPlayed: number) => p.startAge + seasonsPlayed;
 
 export default function DynastyPage() {
+  // point the loaders at the right competition before QuickDraft mounts
+  const comp = useMemo(() => { const c = compFromUrl(); setComp(c); return c; }, []);
+  const homeHref = comp === "aflw" ? "/aflw" : "/";
   const [squad, setSquad] = useState<Partial<Record<Slot, DynastyPlayer>>>({});
   const [seasons, setSeasons] = useState<SeasonRow[]>([]);
   const [phase, setPhase] = useState<"draft" | "ready" | "simming" | "refill" | "over">("draft");
@@ -104,7 +109,7 @@ export default function DynastyPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
+      <span className="flex items-center gap-2"><Link href={homeHref} className="font-display text-2xl font-black text-grass">23–0</Link><Link href={homeHref} className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 {comp === "aflw" ? "AFLW" : "HOME"}</Link></span>
       <h1 className="font-display mt-4 text-3xl font-black">Dynasty</h1>
       <p className="mt-1 text-sm text-slate-400">
         Draft five, then coach them through the years. Players age, decline and retire —
@@ -213,7 +218,7 @@ export default function DynastyPage() {
             <button
               onClick={async () => {
                 await navigator.clipboard.writeText(
-                  `My AFL 23-0 dynasty: ${flags} flag${flags === 1 ? "" : "s"} in ${MAX_SEASONS} seasons 👑 Build yours: https://afl23-0.com/dynasty/`,
+                  `My ${comp === "aflw" ? "AFLW" : "AFL"} 23-0 dynasty: ${flags} flag${flags === 1 ? "" : "s"} in ${MAX_SEASONS} seasons 👑 Build yours: https://afl23-0.com/dynasty/${comp === "aflw" ? "?comp=aflw" : ""}`,
                 );
               }}
               className="rounded-xl bg-grass px-7 py-2.5 font-display text-base font-black text-pitch hover:bg-lime-300"

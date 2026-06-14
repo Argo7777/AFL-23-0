@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import QuickDraft, { bestOpenSlot, QuickPick } from "@/components/QuickDraft";
 import Confetti from "@/components/Confetti";
-import { loadMeta, loadStrengths, poolStrengths } from "@/lib/game/data";
+import { loadMeta, loadStrengths, poolStrengths, setComp } from "@/lib/game/data";
+import { compFromUrl } from "@/lib/game/useComp";
 import { randomSeed } from "@/lib/game/rng";
 import { SeriesResult, simulateSeries } from "@/lib/game/sim";
 import { Slot, scoreInSlot } from "@/lib/game/types";
@@ -35,6 +36,8 @@ function TeamList({ name, picks, color }: { name: string; picks: DuelPick[]; col
 }
 
 export default function DuelPage() {
+  const comp = useMemo(() => { const c = compFromUrl(); setComp(c); return c; }, []);
+  const homeHref = comp === "aflw" ? "/aflw" : "/";
   const [picksA, setPicksA] = useState<DuelPick[]>([]);
   const [picksB, setPicksB] = useState<DuelPick[]>([]);
   const [turn, setTurn] = useState<"A" | "B">("A");
@@ -74,7 +77,7 @@ export default function DuelPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
+      <span className="flex items-center gap-2"><Link href={homeHref} className="font-display text-2xl font-black text-grass">23–0</Link><Link href={homeHref} className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 {comp === "aflw" ? "AFLW" : "HOME"}</Link></span>
       <h1 className="font-display mt-4 text-3xl font-black">Draft Duel</h1>
       <p className="mt-1 text-sm text-slate-400">
         Pass the phone. Two coaches alternate spins, five picks each — then the teams
