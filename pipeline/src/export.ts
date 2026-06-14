@@ -152,6 +152,75 @@ export function exportData() {
   });
   writeFileSync(join(OUT_DIR, "premierships.json"), JSON.stringify(premierships));
 
+  // ---- season ladders + results (real fixtures, every year) ----
+  // Backs the AFL Ladder / Fixtures & Results / per-season pages. Names are
+  // kept era-authentic (South Melbourne, Footscray…) for the listings; the web
+  // layer canonicalises for club links.
+  const seasonRows = db
+    .prepare(
+      `SELECT date, year, round, team1, score1, team2, score2, venue
+         FROM matches ORDER BY year, rowid`,
+    )
+    .all() as {
+    date: string; year: number; round: string;
+    team1: string; score1: number; team2: string; score2: number; venue: string | null;
+  }[];
+
+  const isHA = (r: string) => /^R\d+$/.test(r);
+  type LadderRow = {
+    team: string; p: number; w: number; l: number; d: number;
+    pf: number; pa: number; pts: number; pct: number;
+  };
+  const seasonMatches: Record<string, [string, string, string, number, string, number, string][]> = {};
+  const ladders: Record<string, LadderRow[]> = {};
+
+  const byYear = new Map<number, typeof seasonRows>();
+  for (const m of seasonRows) {
+    (byYear.get(m.year) ?? byYear.set(m.year, []).get(m.year)!).push(m);
+  }
+  for (const [year, rows] of byYear) {
+    // results: [round, date, team1, score1, team2, score2, venue]
+    seasonMatches[year] = rows.map((m) => [
+      m.round, m.date, m.team1, m.score1, m.team2, m.score2, m.venue ?? "",
+    ]);
+    // ladder: home-and-away only
+    const tally = new Map<string, LadderRow>();
+    const get = (t: string) =>
+      tally.get(t) ?? tally.set(t, { team: t, p: 0, w: 0, l: 0, d: 0, pf: 0, pa: 0, pts: 0, pct: 0 }).get(t)!;
+    for (const m of rows) {
+      if (!isHA(m.round)) continue;
+      const a = get(m.team1), b = get(m.team2);
+      a.p++; b.p++;
+      a.pf += m.score1; a.pa += m.score2;
+      b.pf += m.score2; b.pa += m.score1;
+      if (m.score1 > m.score2) { a.w++; b.l++; }
+      else if (m.score1 < m.score2) { b.w++; a.l++; }
+      else { a.d++; b.d++; }
+    }
+    const rowsOut = [...tally.values()];
+    for (const r of rowsOut) {
+      r.pts = r.w * 4 + r.d * 2;
+      r.pct = r.pa > 0 ? Math.round((r.pf / r.pa) * 1000) / 10 : 0;
+    }
+    rowsOut.sort((a, b) => b.pts - a.pts || b.pct - a.pct || b.pf - a.pf);
+    ladders[year] = rowsOut;
+  }
+  writeFileSync(join(OUT_DIR, "season-matches.json"), JSON.stringify(seasonMatches));
+  writeFileSync(join(OUT_DIR, "seasons.json"), JSON.stringify(ladders));
+
+  // compact current-season snapshot for the home page (latest round + ladder)
+  const latestYear = Math.max(...byYear.keys());
+  const latestRows = byYear.get(latestYear)!;
+  const haRoundNum = (r: string) => (isHA(r) ? Number(r.slice(1)) : -1);
+  const latestRound = latestRows.reduce((mx, m) => Math.max(mx, haRoundNum(m.round)), 0);
+  const latestResults = latestRows
+    .filter((m) => haRoundNum(m.round) === latestRound)
+    .map((m) => ({ t1: m.team1, s1: m.score1, t2: m.team2, s2: m.score2, v: m.venue ?? "", d: m.date }));
+  writeFileSync(
+    join(OUT_DIR, "season-current.json"),
+    JSON.stringify({ year: latestYear, round: latestRound, ladder: ladders[latestYear], results: latestResults }),
+  );
+
   // ---- top players per decade (synthetic all-star opponents) ----
   // [name, best rating, primary club] so opposing line-ups can be inspected
   const topRatings: Record<string, [string, number, string][]> = {};

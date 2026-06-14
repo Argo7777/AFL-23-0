@@ -453,7 +453,7 @@ export default function ResultView({
               </div>
             ) : (
               <p className="w-full text-center text-sm text-grass">
-                On the board! <Link href="/ladder" className="underline">See the global ladder →</Link>
+                On the board! <Link href="/leaderboard" className="underline">See the global leaderboard →</Link>
               </p>
             )
           ) : (

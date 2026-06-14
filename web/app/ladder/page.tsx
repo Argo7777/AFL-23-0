@@ -1,112 +1,62 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { BoardEntry, fetchBoard, LEADERBOARD_URL } from "@/lib/game/leaderboard";
-import { dailyNumber, todayMelbourne } from "@/lib/game/profile";
+import LadderTable from "@/components/LadderTable";
+import SeasonPicker from "@/components/SeasonPicker";
+import AdSlot from "@/components/AdSlot";
+import { AD_SLOTS } from "@/lib/ads";
+import { allSeasonYears, currentYear, seasonLadder, slugMap } from "@/lib/seasondb";
 
-const MODE_LABEL: Record<string, string> = {
-  classic5: "Classic 5", full23: "Full 23", cap23: "Salary Cap",
-};
+export const dynamic = "force-static";
 
-/** how September ended for this entry */
-function FinChip({ fin }: { fin?: string }) {
-  if (!fin) return null;
-  return fin === "P" ? (
-    <span className="shrink-0 rounded-full bg-gold/20 px-1.5 py-0.5 text-[10px] font-bold text-gold">🏆 PREMIERS</span>
-  ) : (
-    <span className="shrink-0 rounded-full bg-ice/10 px-1.5 py-0.5 text-[10px] font-bold text-ice">out in {fin}</span>
-  );
-}
-
-function DailyBoard({ entries }: { entries: BoardEntry[] }) {
-  return (
-    <section className="rounded-2xl border border-line bg-pitch-light p-4">
-      <h2 className="font-display text-lg font-black text-gold">Daily #{dailyNumber()} — today</h2>
-      <div className="mt-2 grid gap-1">
-        {entries.length === 0 && (
-          <p className="py-4 text-center text-sm text-slate-500">No entries yet — be the first.</p>
-        )}
-        {entries.map((e, i) => (
-          <div key={i} className="flex items-center gap-3 rounded-lg bg-pitch px-3 py-1.5 text-sm">
-            <span className={`w-6 shrink-0 text-right font-display font-black ${i < 3 ? "text-gold" : "text-slate-500"}`}>
-              {i + 1}
-            </span>
-            <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
-              {e.n}
-            </span>
-            <FinChip fin={e.fin} />
-            <span className="shrink-0 text-xs text-slate-500">r{e.r.toFixed(0)}</span>
-            <span className="w-12 shrink-0 text-right font-display font-black text-grass">
-              {e.w}-{e.l}
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ClubBoard({ entries }: { entries: BoardEntry[] }) {
-  return (
-    <section className="rounded-2xl border border-grass/50 bg-pitch-light p-4">
-      <h2 className="font-display text-lg font-black text-grass">The 23-0 Club</h2>
-      <p className="mt-0.5 text-[11px] text-slate-500">perfect seasons only · newest first</p>
-      <div className="mt-2 grid gap-1">
-        {entries.length === 0 && (
-          <p className="py-4 text-center text-sm text-slate-500">
-            Nobody has run the table yet. Immortality awaits.
-          </p>
-        )}
-        {entries.map((e, i) => (
-          <div key={i} className="flex items-center gap-3 rounded-lg bg-pitch px-3 py-1.5 text-sm">
-            <span className="shrink-0 font-display font-black text-grass">23-0</span>
-            <span className="min-w-0 flex-1 truncate font-display font-black text-slate-100">
-              {e.n}
-            </span>
-            <FinChip fin={e.fin} />
-            <span className="shrink-0 text-xs text-slate-500">{MODE_LABEL[e.m] ?? e.m}</span>
-            <span className="shrink-0 text-xs text-slate-500">
-              {new Date(e.t).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+export function generateMetadata(): Metadata {
+  const y = currentYear();
+  return {
+    title: `${y} AFL Ladder — current standings, wins, percentage & points`,
+    description: `The live ${y} AFL ladder: every club's wins, losses, draws, points for and against, percentage and premiership points — updated through the latest round. Real data, era-fair.`,
+    alternates: { canonical: "/ladder" },
+  };
 }
 
 export default function LadderPage() {
-  const [board, setBoard] = useState<{ daily: BoardEntry[]; club: BoardEntry[] } | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetchBoard(todayMelbourne()).then((b) => {
-      setBoard(b);
-      setLoaded(true);
-    });
-  }, []);
+  const year = currentYear();
+  const rows = seasonLadder(year);
+  const years = allSeasonYears();
+  const slugs = slugMap(rows.map((r) => r.team));
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
-      <h1 className="font-display mt-4 text-3xl font-black">The Global Ladder</h1>
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      <span className="flex items-center gap-2">
+        <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
+        <Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link>
+      </span>
+
+      <h1 className="font-display mt-4 text-3xl font-black sm:text-4xl">{year} AFL Ladder</h1>
       <p className="mt-1 text-sm text-slate-400">
-        Today&apos;s daily contest, and the immortals who went 23-0. Post a score from any result screen.
+        Current standings — home-and-away wins, losses, percentage and premiership points.{" "}
+        <Link href="/results" className="text-ice hover:underline">See the fixtures &amp; results →</Link>
       </p>
 
-      {!LEADERBOARD_URL || (loaded && !board) ? (
-        <div className="mt-8 rounded-2xl border border-line bg-pitch-light p-8 text-center text-slate-400">
-          The global ladder is warming up — check back soon. 🏗️
-        </div>
-      ) : !loaded ? (
-        <p className="mt-8 text-center text-slate-500">loading the ladder…</p>
-      ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <DailyBoard entries={board!.daily} />
-          <ClubBoard entries={board!.club} />
-        </div>
-      )}
+      <div className="mt-5">
+        <SeasonPicker years={years} current={year} />
+      </div>
+
+      <div className="mt-5">
+        <LadderTable rows={rows} slugs={slugs} finalsCut={8} />
+      </div>
+
+      <AdSlot slot={AD_SLOTS.content} className="mt-6" />
+
+      <div className="mt-8 flex flex-wrap gap-2 text-sm">
+        <Link href="/results" className="rounded-xl border border-line bg-pitch-light px-4 py-2 font-display font-black text-slate-200 hover:border-ice/50">Fixtures &amp; Results →</Link>
+        <Link href="/seasons" className="rounded-xl border border-line bg-pitch-light px-4 py-2 font-display font-black text-slate-200 hover:border-ice/50">Every season since 1897 →</Link>
+        <Link href="/premierships" className="rounded-xl border border-line bg-pitch-light px-4 py-2 font-display font-black text-slate-200 hover:border-ice/50">Premiership history →</Link>
+      </div>
+
+      <p className="mt-6 text-center">
+        <Link href="/play" className="font-display inline-block rounded-xl bg-grass px-8 py-3 text-lg font-black text-pitch hover:bg-lime-300">
+          BUILD YOUR ALL-ERA TEAM →
+        </Link>
+      </p>
     </main>
   );
 }

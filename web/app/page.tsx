@@ -52,6 +52,11 @@ export default function Home() {
   const [oneClub, setOneClub] = useState("");
   const [board, setBoard] = useState<{ daily: BoardEntry[]; club: BoardEntry[] } | null>(null);
   const [otd, setOtd] = useState<{ y: number; r: string; t1: string; s1: number; t2: string; s2: number } | null>(null);
+  const [season, setSeason] = useState<{
+    year: number; round: number;
+    ladder: { team: string; w: number; l: number; d: number; pts: number; pct: number }[];
+    results: { t1: string; s1: number; t2: string; s2: number; v: string }[];
+  } | null>(null);
 
   useEffect(() => {
     loadMeta().then((m) => {
@@ -71,6 +76,10 @@ export default function Home() {
       .then((d) => setOtd(d[key] ?? null))
       .catch(() => {});
     fetchBoard(todayMelbourne()).then(setBoard).catch(() => {});
+    fetch(`${BASE_PATH}/data/season-current.json`)
+      .then((r) => r.json())
+      .then(setSeason)
+      .catch(() => {});
   }, []);
 
   const toggleEra = (d: number) => {
@@ -103,18 +112,6 @@ export default function Home() {
           ],
         }) }}
       />
-      {/* cross-promo: the soccer sibling */}
-      <div className="flex justify-center">
-        <a
-          href="https://footballinvincibles.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-full border border-ice/40 bg-ice/5 px-4 py-1.5 text-xs font-semibold text-ice transition hover:bg-ice/10"
-        >
-          ⚽ Into soccer? Try the Football version → Football Invincibles
-        </a>
-      </div>
-
       <header className="mt-5 text-center">
         <div className="relative inline-block">
           <div className="hero-glow" aria-hidden />
@@ -175,6 +172,61 @@ export default function Home() {
           Today&apos;s daily: <b className="text-grass">{daily.wins}-{daily.losses}</b>
           {daily.flag ? " 🏆" : ""} — back tomorrow for #{dailyNumber() + 1}.
         </p>
+      )}
+
+      {/* current season — real ladder + latest results (stats-site centrepiece) */}
+      {season && season.ladder?.length > 0 && (
+        <section className="mt-10">
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-display text-xl font-black">
+              {season.year} Season <span className="text-sm text-slate-500">· Round {season.round}</span>
+            </h2>
+            <Link href="/ladder" className="text-xs font-semibold text-ice hover:underline">full ladder →</Link>
+          </div>
+          <div className="mt-3 grid gap-4 md:grid-cols-2">
+            {/* ladder top 8 */}
+            <div className="overflow-hidden rounded-2xl border border-line bg-pitch-light">
+              <div className="flex items-center justify-between border-b border-line/60 px-4 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gold">Ladder · top 8</span>
+                <Link href="/ladder" className="text-[11px] text-ice hover:underline">all 18 →</Link>
+              </div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {season.ladder.slice(0, 8).map((r, i) => (
+                    <tr key={r.team} className="border-t border-line/40">
+                      <td className="py-1.5 pl-3 pr-1 font-display font-black text-grass">{i + 1}</td>
+                      <td className="py-1.5 font-display font-black text-slate-100">{r.team}</td>
+                      <td className="py-1.5 text-right text-xs text-slate-500">{r.w}-{r.l}{r.d ? `-${r.d}` : ""}</td>
+                      <td className="py-1.5 pr-1 text-right text-xs text-slate-500">{r.pct.toFixed(1)}%</td>
+                      <td className="py-1.5 pr-3 text-right font-display font-black text-gold">{r.pts}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* latest round results */}
+            <div className="overflow-hidden rounded-2xl border border-line bg-pitch-light">
+              <div className="flex items-center justify-between border-b border-line/60 px-4 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-ice">Round {season.round} results</span>
+                <Link href="/results" className="text-[11px] text-ice hover:underline">all results →</Link>
+              </div>
+              <div className="grid gap-1 p-2">
+                {season.results.slice(0, 9).map((m, i) => {
+                  const w1 = m.s1 > m.s2, w2 = m.s2 > m.s1;
+                  return (
+                    <div key={i} className="flex items-center gap-2 rounded-lg bg-pitch px-3 py-1.5 text-sm">
+                      <span className={`min-w-0 flex-1 truncate text-right font-display font-black ${w1 ? "text-slate-100" : "text-slate-500"}`}>{m.t1}</span>
+                      <span className={`w-7 shrink-0 text-right font-display font-black tabular-nums ${w1 ? "text-grass" : "text-slate-500"}`}>{m.s1}</span>
+                      <span className="shrink-0 text-[10px] text-slate-600">v</span>
+                      <span className={`w-7 shrink-0 font-display font-black tabular-nums ${w2 ? "text-grass" : "text-slate-500"}`}>{m.s2}</span>
+                      <span className={`min-w-0 flex-1 truncate font-display font-black ${w2 ? "text-slate-100" : "text-slate-500"}`}>{m.t2}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
       )}
 
       {/* choose your mode (drives the START button above) */}
@@ -240,7 +292,7 @@ export default function Home() {
           <div className="rounded-2xl border border-line bg-pitch-light p-4">
             <div className="flex items-baseline justify-between">
               <h2 className="font-display text-lg font-black text-gold">Daily #{dailyNumber()} — world top 5</h2>
-              <Link href="/ladder" className="text-xs text-ice hover:underline">full ladder →</Link>
+              <Link href="/leaderboard" className="text-xs text-ice hover:underline">full board →</Link>
             </div>
             <div className="mt-2 grid gap-1">
               {board.daily.length === 0 && (
@@ -267,7 +319,7 @@ export default function Home() {
           <div className="rounded-2xl border border-grass/50 bg-pitch-light p-4">
             <div className="flex items-baseline justify-between">
               <h2 className="font-display text-lg font-black text-grass">The 23-0 Club</h2>
-              <Link href="/ladder" className="text-xs text-ice hover:underline">full ladder →</Link>
+              <Link href="/leaderboard" className="text-xs text-ice hover:underline">full board →</Link>
             </div>
             <div className="mt-2 grid gap-1">
               {board.club.length === 0 && (
