@@ -7,6 +7,7 @@ import { clubColors } from "@/lib/game/clubColors";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
 import { amazonBooksLink } from "@/lib/affiliate";
+import { clubSlug } from "@/lib/clubdb";
 
 export const dynamic = "force-static";
 export const dynamicParams = false;
@@ -57,7 +58,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
         <div>
           <h1 className="font-display text-4xl font-black">{c.name}</h1>
           <p className="text-sm text-slate-400">
-            {clubs.join(", ")} · {years[0]}–{years[1]} · {games} games
+            {clubs.map((club, i) => (
+              <span key={club}>
+                {i > 0 && ", "}
+                <Link href={`/club/${clubSlug(club)}`} className="hover:text-ice hover:underline">{club}</Link>
+              </span>
+            ))}
+            {" · "}{years[0]}–{years[1]} · {games} games
             {c.decades[0].h ? ` · ${c.decades[0].h}cm` : ""}
           </p>
         </div>
@@ -133,8 +140,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
       </p>
       <p className="mt-3 text-center text-xs text-slate-600">
         Ratings are era-fair and derived from real stats —{" "}
-        <Link href="/about" className="underline">methodology</Link> ·{" "}
-        <Link href="/greats" className="underline">all the greats</Link>
+        <Link href="/clubs" className="underline">clubs</Link> ·{" "}
+        <Link href="/greats" className="underline">all the greats</Link> ·{" "}
+        <Link href="/honours" className="underline">honour roll</Link>
       </p>
     </main>
   );

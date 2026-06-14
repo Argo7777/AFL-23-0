@@ -90,6 +90,19 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: [
+            { "@type": "Question", name: "How are AFL players rated in 23-0?", acceptedAnswer: { "@type": "Answer", text: "Every player is rated within their own decade against their peers, using era-relative per-game statistics from afltables.com plus real honours from footywire.com — Brownlow votes, All-Australian selections, premierships from actual Grand Final lineups and leading-goalkicker titles. Each decade is calibrated to the same scale so eras compete fairly." } },
+            { "@type": "Question", name: "Is it possible to go 23-0?", acceptedAnswer: { "@type": "Answer", text: "Barely. Seasons are simulated against all-star teams drawn from history's best, the fixture leans toward quality, and no side escapes the chance of an upset. Even the greatest team ever assembled almost never gets through untouched — that's the chase." } },
+            { "@type": "Question", name: "Is AFL 23-0 free?", acceptedAnswer: { "@type": "Answer", text: "Yes — every mode, the daily challenges and the trivia games are free to play in any browser, with no account needed." } },
+            { "@type": "Question", name: "What data is AFL 23-0 built on?", acceptedAnswer: { "@type": "Answer", text: "130 years of real VFL/AFL data: per-season player stats since 1897, every match result, Grand Final lineups, Brownlow tallies, All-Australian teams and Coleman Medals — refreshed weekly." } },
+          ],
+        }) }}
+      />
       {/* cross-promo: the soccer sibling */}
       <div className="flex justify-center">
         <a
@@ -495,9 +508,7 @@ export default function Home() {
               the greats
             </Link>{" "}
             ·{" "}
-            <Link href="/about" className="text-slate-400 underline hover:text-ice">
-              about the numbers
-            </Link>
+            <Link href="/premierships" className="text-slate-400 underline hover:text-ice">premierships</Link>
           </p>
         )}
       </div>

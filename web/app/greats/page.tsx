@@ -45,7 +45,7 @@ export default function GreatsPage() {
       <p className="mt-1 text-sm text-slate-400">
         Every player rated from real stats, Brownlow votes and honours — era-fair, so the
         champions of 1925 stand beside the champions of 2025.{" "}
-        <Link href="/about" className="text-ice underline">How the ratings work</Link>.
+        Ratings are era-fair, built from real stats.
       </p>
 
       <div className="mt-5 flex flex-wrap gap-1.5">

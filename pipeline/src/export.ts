@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { db } from "./lib/db.js";
+import { canonicalClub } from "./lib/clubs.js";
 import { computeRatings, PlayerDecade } from "./compute/ratings.js";
 import { computeTeamStrengths } from "./compute/team-strengths.js";
 import {
@@ -133,6 +134,23 @@ export function exportData() {
     onThisDay[k] = { y: m.year, r: m.round, t1: m.team1, s1: m.score1, t2: m.team2, s2: m.score2 };
   }
   writeFileSync(join(OUT_DIR, "onthisday.json"), JSON.stringify(onThisDay));
+
+  // ---- premiership history (Grand Finals), newest first ----
+  const gfRows = db
+    .prepare(`SELECT year, team1, score1, team2, score2, venue FROM matches WHERE round='GF' ORDER BY year DESC`)
+    .all() as { year: number; team1: string; score1: number; team2: string; score2: number; venue: string | null }[];
+  const premierships = gfRows.map((m) => {
+    const homeWon = m.score1 >= m.score2;
+    return {
+      year: m.year,
+      premier: canonicalClub(homeWon ? m.team1 : m.team2),
+      runnerUp: canonicalClub(homeWon ? m.team2 : m.team1),
+      premierScore: homeWon ? m.score1 : m.score2,
+      runnerScore: homeWon ? m.score2 : m.score1,
+      venue: m.venue ?? "",
+    };
+  });
+  writeFileSync(join(OUT_DIR, "premierships.json"), JSON.stringify(premierships));
 
   // ---- top players per decade (synthetic all-star opponents) ----
   // [name, best rating, primary club] so opposing line-ups can be inspected

@@ -18,7 +18,7 @@ export default function Footer() {
         <Link href="/greats" className="hover:text-ice hover:underline">the greats</Link> ·{" "}
         <Link href="/ladder" className="hover:text-ice hover:underline">ladder</Link> ·{" "}
         <Link href="/me" className="hover:text-ice hover:underline">my career</Link> ·{" "}
-        <Link href="/about" className="hover:text-ice hover:underline">about the numbers</Link>
+        <Link href="/premierships" className="hover:text-ice hover:underline">premierships</Link>
       </p>
       <p className="mt-2 text-[11px] text-slate-600">
         AFL 23-0 — a fan project. Ratings derived from real data (afltables.com, footywire.com).

@@ -3,10 +3,11 @@ import Link from "next/link";
 const LINKS: [string, string][] = [
   ["Play", "/"],
   ["Players", "/greats"],
+  ["Clubs", "/clubs"],
+  ["Premierships", "/premierships"],
   ["Honour Roll", "/honours"],
   ["Ladder", "/ladder"],
   ["Daily", "/legend"],
-  ["Stats", "/about"],
 ];
 
 /** Slim sitewide nav — gives the stats-site feel and strong internal linking. */
