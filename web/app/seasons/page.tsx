@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import SeasonsGrid, { type SeasonCard } from "@/components/SeasonsGrid";
+import CompSwitch from "@/components/CompSwitch";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
 import { allSeasonYears, seasonPremier } from "@/lib/seasondb";
@@ -21,10 +22,13 @@ export default function SeasonsPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <span className="flex items-center gap-2">
-        <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
-        <Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link>
-      </span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="flex items-center gap-2">
+          <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
+          <Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link>
+        </span>
+        <CompSwitch active="afl" aflHref="/seasons" aflwHref="/aflw/seasons" />
+      </div>
 
       <h1 className="font-display mt-4 text-3xl font-black sm:text-4xl">Every Season since 1897</h1>
       <p className="mt-1 text-sm text-slate-400">

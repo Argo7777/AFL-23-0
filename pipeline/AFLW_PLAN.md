@@ -1,5 +1,17 @@
 # AFLW — source check & ingestion plan
 
+## STATUS (shipped)
+**Stats mode is LIVE.** `scrape:aflw` pulls all 11 AFLW comp-seasons' fixtures/results
+from the official AFL API into `aflw_matches`; export emits `aflw.json` +
+`aflw-matches.json`; web has `/aflw` (hub), `/aflw/ladder`, `/aflw/results`,
+`/aflw/seasons`, `/aflw/season/[key]`, `/aflw/premierships`, a home AFL⇄AFLW toggle,
+and a CompSwitch on every AFL stats page. AFL remains primary.
+**Still TODO (phase 2): AFLW players / ratings / greats / game modes** — needs the
+player season-stats ingest (`cfs/afl/statsCentre/players?seasonId=CD_S{year}264`,
+returns ~800 records/season with per-game averages) + a rating pass.
+
+
+
 ## Source availability (checked 2026-06-14)
 
 | Source | AFLW data? | Notes |

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { allClubNames, clubSlug } from "@/lib/clubdb";
 import { allSeasonYears, currentYear } from "@/lib/seasondb";
+import { aflwSeasonKeys } from "@/lib/aflwdb";
 
 export const dynamic = "force-static";
 
@@ -21,6 +22,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/higher/`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${base}/awarded/`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${base}/tips/`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${base}/aflw/`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/aflw/ladder/`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/aflw/results/`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/aflw/seasons/`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${base}/aflw/premierships/`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${base}/leaderboard/`, changeFrequency: "daily", priority: 0.5 },
     { url: `${base}/duel/`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/rebuild/`, changeFrequency: "monthly", priority: 0.5 },
@@ -37,5 +43,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: y === cur ? "daily" : "yearly",
     priority: y === cur ? 0.8 : 0.5,
   }));
-  return [...core, ...clubs, ...seasons];
+  const aflwSeasons: MetadataRoute.Sitemap = aflwSeasonKeys().map((k) => ({
+    url: `${base}/aflw/season/${k}/`,
+    changeFrequency: "yearly",
+    priority: 0.5,
+  }));
+  return [...core, ...clubs, ...seasons, ...aflwSeasons];
 }

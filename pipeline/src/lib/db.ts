@@ -40,6 +40,18 @@ CREATE TABLE IF NOT EXISTS gf_players (
   PRIMARY KEY (year, team, player_name)
 );
 
+CREATE TABLE IF NOT EXISTS aflw_matches (
+  match_id TEXT PRIMARY KEY,       -- AFL API provider match id
+  season_key TEXT NOT NULL,        -- "2025", "2022-s6", "2022-s7" (2022 ran twice)
+  label TEXT NOT NULL,             -- display label e.g. "2022 S7"
+  date TEXT NOT NULL,              -- "8-Nov-2025" (Melbourne local)
+  year INTEGER NOT NULL,           -- calendar year (sort/era)
+  round TEXT NOT NULL,             -- R1..R12, EF/SF/PF/GF
+  team1 TEXT NOT NULL, score1 INTEGER NOT NULL,
+  team2 TEXT NOT NULL, score2 INTEGER NOT NULL,
+  venue TEXT
+);
+
 CREATE TABLE IF NOT EXISTS brownlow (
   year INTEGER NOT NULL,
   player_name TEXT NOT NULL,       -- "First Last" (footywire format)

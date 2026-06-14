@@ -221,6 +221,104 @@ export function exportData() {
     JSON.stringify({ year: latestYear, round: latestRound, ladder: ladders[latestYear], results: latestResults }),
   );
 
+  // ---- AFLW (parallel competition, from the AFL API) ----
+  // Mirrors the AFL season export but keyed by season_key ("2022-s6"/"2022-s7"
+  // disambiguate the 2022 doubleheader). AFL stays the primary surface.
+  const aflwRows = db
+    .prepare(
+      `SELECT season_key, label, year, round, team1, score1, team2, score2, venue, date
+         FROM aflw_matches ORDER BY year, season_key, rowid`,
+    )
+    .all() as {
+    season_key: string; label: string; year: number; round: string;
+    team1: string; score1: number; team2: string; score2: number; venue: string | null; date: string;
+  }[];
+
+  if (aflwRows.length > 0) {
+    const aflwByKey = new Map<string, typeof aflwRows>();
+    const labelOf = new Map<string, string>();
+    const yearOf = new Map<string, number>();
+    for (const m of aflwRows) {
+      (aflwByKey.get(m.season_key) ?? aflwByKey.set(m.season_key, []).get(m.season_key)!).push(m);
+      labelOf.set(m.season_key, m.label);
+      yearOf.set(m.season_key, m.year);
+    }
+
+    const aflwMatches: Record<string, [string, string, string, number, string, number, string][]> = {};
+    const aflwLadders: Record<string, LadderRow[]> = {};
+    for (const [key, rows] of aflwByKey) {
+      aflwMatches[key] = rows.map((m) => [m.round, m.date, m.team1, m.score1, m.team2, m.score2, m.venue ?? ""]);
+      const tally = new Map<string, LadderRow>();
+      const get = (t: string) =>
+        tally.get(t) ?? tally.set(t, { team: t, p: 0, w: 0, l: 0, d: 0, pf: 0, pa: 0, pts: 0, pct: 0 }).get(t)!;
+      for (const m of rows) {
+        if (!isHA(m.round)) continue;
+        const a = get(m.team1), b = get(m.team2);
+        a.p++; b.p++;
+        a.pf += m.score1; a.pa += m.score2; b.pf += m.score2; b.pa += m.score1;
+        if (m.score1 > m.score2) { a.w++; b.l++; }
+        else if (m.score1 < m.score2) { b.w++; a.l++; }
+        else { a.d++; b.d++; }
+      }
+      const out = [...tally.values()];
+      for (const r of out) {
+        r.pts = r.w * 4 + r.d * 2;
+        r.pct = r.pa > 0 ? Math.round((r.pf / r.pa) * 1000) / 10 : 0;
+      }
+      out.sort((a, b) => b.pts - a.pts || b.pct - a.pct || b.pf - a.pf);
+      aflwLadders[key] = out;
+    }
+
+    // premiers from each Grand Final
+    const aflwPrems = aflwRows
+      .filter((m) => m.round === "GF")
+      .map((m) => {
+        const homeWon = m.score1 >= m.score2;
+        return {
+          key: m.season_key, label: m.label, year: m.year,
+          premier: homeWon ? m.team1 : m.team2,
+          runnerUp: homeWon ? m.team2 : m.team1,
+          premierScore: homeWon ? m.score1 : m.score2,
+          runnerScore: homeWon ? m.score2 : m.score1,
+          venue: m.venue ?? "",
+        };
+      });
+    const premByKey = new Map(aflwPrems.map((p) => [p.key, p]));
+
+    // ordered season list (newest first) with premier
+    const seasonKeys = [...aflwByKey.keys()].sort(
+      (a, b) => (yearOf.get(b)! - yearOf.get(a)!) || b.localeCompare(a),
+    );
+    const aflwSeasons = seasonKeys.map((key) => ({
+      key, label: labelOf.get(key)!, year: yearOf.get(key)!,
+      premier: premByKey.get(key)?.premier ?? null,
+      runnerUp: premByKey.get(key)?.runnerUp ?? null,
+    }));
+
+    // current = newest season that has any completed matches
+    const currentKey = seasonKeys.find((k) => aflwLadders[k]?.some((r) => r.p > 0)) ?? seasonKeys[0];
+    const curRows = aflwByKey.get(currentKey)!;
+    const curLatestRound = curRows.reduce((mx, m) => Math.max(mx, isHA(m.round) ? Number(m.round.slice(1)) : -1), 0);
+    const curResults = curRows
+      .filter((m) => isHA(m.round) && Number(m.round.slice(1)) === curLatestRound)
+      .map((m) => ({ t1: m.team1, s1: m.score1, t2: m.team2, s2: m.score2, v: m.venue ?? "", d: m.date }));
+
+    writeFileSync(join(OUT_DIR, "aflw-matches.json"), JSON.stringify(aflwMatches));
+    writeFileSync(
+      join(OUT_DIR, "aflw.json"),
+      JSON.stringify({
+        current: {
+          key: currentKey, label: labelOf.get(currentKey)!, year: yearOf.get(currentKey)!,
+          round: curLatestRound, ladder: aflwLadders[currentKey], results: curResults,
+        },
+        seasons: aflwSeasons,
+        ladders: aflwLadders,
+        premierships: aflwPrems.slice().reverse(),
+      }),
+    );
+    console.log(`AFLW: exported ${seasonKeys.length} seasons (current ${labelOf.get(currentKey)})`);
+  }
+
   // ---- top players per decade (synthetic all-star opponents) ----
   // [name, best rating, primary club] so opposing line-ups can be inspected
   const topRatings: Record<string, [string, number, string][]> = {};

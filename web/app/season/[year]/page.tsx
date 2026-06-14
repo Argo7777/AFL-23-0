@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import LadderTable from "@/components/LadderTable";
 import ResultsList from "@/components/ResultsList";
 import SeasonPicker from "@/components/SeasonPicker";
+import CompSwitch from "@/components/CompSwitch";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
 import {
@@ -50,10 +51,13 @@ export default async function SeasonPage({ params }: { params: Promise<{ year: s
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <span className="flex items-center gap-2">
-        <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
-        <Link href="/seasons" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">← ALL SEASONS</Link>
-      </span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="flex items-center gap-2">
+          <Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link>
+          <Link href="/seasons" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">← ALL SEASONS</Link>
+        </span>
+        <CompSwitch active="afl" aflHref="/seasons" aflwHref="/aflw/seasons" />
+      </div>
 
       <h1 className="font-display mt-4 text-3xl font-black sm:text-4xl">
         {y} {league} Season{current ? <span className="ml-2 align-middle text-xs font-black text-grass">LIVE</span> : null}

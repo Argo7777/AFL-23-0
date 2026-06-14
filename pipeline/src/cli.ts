@@ -6,6 +6,7 @@ import { discoverProfiles, crawlProfiles } from "./scrape/footywire-players.js";
 import { scrapeWikidataPositions } from "./scrape/wikidata-enrich.js";
 import { exportData } from "./export.js";
 import { scrapeAfltablesBrownlow } from "./scrape/afltables-brownlow.js";
+import { scrapeAflw } from "./scrape/afl-api.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -49,6 +50,11 @@ async function main() {
       await scrapeWikidataPositions();
       break;
     }
+    case "scrape:aflw": {
+      console.log("Scraping AFLW fixtures/results from the AFL API...");
+      await scrapeAflw(args.includes("--force"));
+      break;
+    }
     case "refresh": {
       // re-scrape only what changes during a season: the current decade's
       // stats/results/awards, then recompute ratings/salaries and re-export.
@@ -62,6 +68,8 @@ async function main() {
       await scrapeBrownlow({ from: decadeStart, to: year, force: true });
       await scrapeAllAustralian({ from: decadeStart, to: year, force: true });
       await scrapeRisingStar({ from: decadeStart, to: year, force: true });
+      console.log("Refreshing AFLW fixtures/results...");
+      await scrapeAflw(true);
       console.log("Recomputing ratings, salaries and strengths...");
       exportData();
       break;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { allPremierships, clubSlug, flagTally } from "@/lib/clubdb";
 import { clubColors } from "@/lib/game/clubColors";
+import CompSwitch from "@/components/CompSwitch";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
 
@@ -20,6 +21,9 @@ export default function PremiershipsPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
+      <div className="mb-4 flex justify-end">
+        <CompSwitch active="afl" aflHref="/premierships" aflwHref="/aflw/premierships" />
+      </div>
       <h1 className="font-display text-3xl font-black">AFL premiership history</h1>
       <p className="mt-1 text-sm text-slate-400">
         Every VFL/AFL Grand Final result — {gfs.length} premierships from {gfs[gfs.length - 1]?.year} to{" "}

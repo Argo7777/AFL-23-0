@@ -112,6 +112,20 @@ export default function Home() {
           ],
         }) }}
       />
+
+      {/* competition toggle — AFL is the main game; AFLW mode is one tap away */}
+      <div className="flex items-center justify-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full border border-line bg-pitch-light p-1">
+          <span className="rounded-full bg-grass px-4 py-1.5 font-display text-xs font-black uppercase tracking-wide text-pitch">AFL</span>
+          <Link
+            href="/aflw"
+            className="rounded-full px-4 py-1.5 font-display text-xs font-black uppercase tracking-wide text-slate-400 transition hover:bg-[#ff5e44] hover:text-white"
+          >
+            AFLW →
+          </Link>
+        </span>
+      </div>
+
       <header className="mt-5 text-center">
         <div className="relative inline-block">
           <div className="hero-glow" aria-hidden />
