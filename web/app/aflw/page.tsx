@@ -84,6 +84,7 @@ export default function AflwHub() {
       <AdSlot slot={AD_SLOTS.content} className="mt-6" />
 
       <div className="mt-8 flex flex-wrap gap-2 text-sm">
+        <Link href="/aflw/greats" className="rounded-xl border border-line bg-pitch-light px-4 py-2 font-display font-black text-slate-200 hover:border-[#ff5e44]/50">Players &amp; Greats →</Link>
         <Link href="/aflw/ladder" className="rounded-xl border border-line bg-pitch-light px-4 py-2 font-display font-black text-slate-200 hover:border-[#ff5e44]/50">Ladder →</Link>
         <Link href="/aflw/results" className="rounded-xl border border-line bg-pitch-light px-4 py-2 font-display font-black text-slate-200 hover:border-[#ff5e44]/50">Fixtures &amp; Results →</Link>
         <Link href="/aflw/seasons" className="rounded-xl border border-line bg-pitch-light px-4 py-2 font-display font-black text-slate-200 hover:border-[#ff5e44]/50">All seasons →</Link>

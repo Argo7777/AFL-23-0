@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { allClubNames, clubSlug } from "@/lib/clubdb";
 import { allSeasonYears, currentYear } from "@/lib/seasondb";
 import { aflwSeasonKeys } from "@/lib/aflwdb";
+import { notableAflwCareers } from "@/lib/aflwplayerdb";
 
 export const dynamic = "force-static";
 
@@ -27,6 +28,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/aflw/results/`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${base}/aflw/seasons/`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${base}/aflw/premierships/`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${base}/aflw/greats/`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${base}/leaderboard/`, changeFrequency: "daily", priority: 0.5 },
     { url: `${base}/about/`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/contact/`, changeFrequency: "yearly", priority: 0.3 },
@@ -51,5 +53,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: "yearly",
     priority: 0.5,
   }));
-  return [...core, ...clubs, ...seasons, ...aflwSeasons];
+  const aflwPlayers: MetadataRoute.Sitemap = notableAflwCareers().map((c) => ({
+    url: `${base}/aflw/player/${c.slug}/`,
+    changeFrequency: "monthly",
+    priority: 0.5,
+  }));
+  return [...core, ...clubs, ...seasons, ...aflwSeasons, ...aflwPlayers];
 }

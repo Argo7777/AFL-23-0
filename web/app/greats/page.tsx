@@ -7,6 +7,7 @@ import { clubColors } from "@/lib/game/clubColors";
 import { honours } from "@/components/PlayerCard";
 import PlayerSheet from "@/components/PlayerSheet";
 import AdSlot, { AD_SLOTS } from "@/components/AdSlot";
+import CompSwitch from "@/components/CompSwitch";
 import { PlayerEntry } from "@/lib/game/types";
 
 export default function GreatsPage() {
@@ -40,7 +41,10 @@ export default function GreatsPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="flex items-center gap-2"><Link href="/" className="font-display text-2xl font-black text-grass">23–0</Link><Link href="/" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-grass/50">🏠 HOME</Link></span>
+        <CompSwitch active="afl" aflHref="/greats" aflwHref="/aflw/greats" />
+      </div>
       <h1 className="font-display mt-4 text-3xl font-black">The Greats, decade by decade</h1>
       <p className="mt-1 text-sm text-slate-400">
         Every player rated from real stats, Brownlow votes and honours — era-fair, so the
