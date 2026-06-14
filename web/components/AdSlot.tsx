@@ -10,8 +10,8 @@ export const ADSENSE_CLIENT = "ca-pub-2087141992057731";
  * Until then both stay "" and no ad boxes render anywhere.
  */
 export const AD_SLOTS = {
-  home: "", // unit shown between sections on the home page
-  result: "", // unit shown on the result screen, below the record
+  home: "5789788385", // "Home" unit — between sections on the home page
+  result: "6838809461", // "Result" unit — result screen, below the record
 };
 
 /**
