@@ -9,7 +9,8 @@ import { clubColors } from "@/lib/game/clubColors";
 /** [year/label, round, team1, score1, team2, score2, p(team1 wins)] */
 type Tip = [string | number, string, string, number, string, number, number];
 
-const toOdds = (p: number) => Math.max(1.01, Math.min(15, 0.95 / p)).toFixed(2);
+// the model's pre-match win chance for a side, as a percentage (no betting framing)
+const winChance = (p: number) => `${Math.round(Math.max(1, Math.min(99, p * 100)))}%`;
 
 export default function TipsPage() {
   const [tips, setTips] = useState<Tip[] | null>(null);
@@ -68,7 +69,7 @@ export default function TipsPage() {
   }
 
   if (!m) {
-    return <main className="flex min-h-dvh items-center justify-center text-slate-400">opening the betting ring…</main>;
+    return <main className="flex min-h-dvh items-center justify-center text-slate-400">checking the form…</main>;
   }
 
   const [year, round, t1, s1, t2, s2, p1] = m;
@@ -99,10 +100,10 @@ export default function TipsPage() {
         </div>
         <div className="font-display mt-3 text-2xl font-black leading-tight">{team}</div>
         <div className={`font-display mt-2 text-xl font-black ${prob < 0.5 ? "text-gold" : "text-slate-400"}`}>
-          ${toOdds(prob)}
+          {winChance(prob)}
         </div>
         <div className="text-[10px] uppercase tracking-wider text-slate-600">
-          {prob < 0.42 ? "underdog — worth double" : prob > 0.58 ? "favourite" : "coin flip"}
+          {prob < 0.42 ? "upset pick · 2 pts" : prob > 0.58 ? "form pick" : "line ball"}
         </div>
         <div className={`font-display mt-3 text-3xl font-black ${revealed ? (won ? "text-grass" : "text-hot") : "text-slate-700"}`}>
           {revealed ? score : "?"}
@@ -131,7 +132,7 @@ export default function TipsPage() {
             , <span className="text-gold">{year}</span>
           </h1>
           <p className="mt-1 text-center text-xs text-slate-500">
-            a real match — tip the winner · underdogs pay double · one miss ends the run
+            a real match — pick the winner · upsets score double · one miss ends the run
           </p>
           <div className="mt-6 flex flex-col gap-4 sm:flex-row">
             <Side idx={0} />

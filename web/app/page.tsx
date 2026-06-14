@@ -474,7 +474,7 @@ export default function Home() {
           </div>
           <div className="font-display mt-1 text-2xl font-black">The Tipping Run</div>
           <p className="mt-2 text-sm text-slate-400">
-            Real matches since 1920. Tip winners, ride the streak — underdogs pay double.
+            Real matches since 1920. Pick winners, ride the streak — call an upset for double points.
           </p>
         </Link>
         <Link

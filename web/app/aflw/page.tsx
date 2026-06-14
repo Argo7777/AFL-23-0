@@ -112,7 +112,7 @@ export default function AflwHub() {
             ["/legend?comp=aflw", "Guess the Legend", "A mystery AFLW great per day — six clues."],
             ["/battler?comp=aflw", "Guess the Battler", "Name the honest AFLW toiler. Real fans only."],
             ["/higher?comp=aflw", "Higher or Lower", "Two AFLW players, one stat — pick the bigger number."],
-            ["/tips?comp=aflw", "The Tipping Run", "Tip real AFLW results — underdogs pay double."],
+            ["/tips?comp=aflw", "The Tipping Run", "Pick real AFLW results — upsets score double points."],
             ["/dynasty?comp=aflw", "Dynasty", "Coach an AFLW era — your stars age and retire."],
             ["/rebuild?comp=aflw", "The Rebuild", "Drag an AFLW basket case to a flag, one trade a year."],
             ["/duel?comp=aflw", "Draft Duel", "Two coaches, one phone — alternating AFLW spins."],
