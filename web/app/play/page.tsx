@@ -4,7 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  BASE_PATH, loadMeta, loadPool, loadStrengths, loadTopRatings, poolStrengths,
+  BASE_PATH, Comp, eraLabel, loadMeta, loadPool, loadStrengths, loadTopRatings,
+  poolStrengths, setComp,
 } from "@/lib/game/data";
 import { dailySeed, recordGame, todayMelbourne } from "@/lib/game/profile";
 import { mulberry32, randomSeed } from "@/lib/game/rng";
@@ -56,6 +57,7 @@ function PlayInner() {
   const targetRecord = params.get("target"); // a mate's "20-3" to beat
   const targetRating = Number(params.get("trating")) || null; // for the showdown
   const lockedClub = params.get("club"); // one-club legends
+  const comp: Comp = params.get("comp") === "aflw" ? "aflw" : "afl";
   const isSpoon = mode === "spoon";
   const isGauntlet = mode === "gauntlet";
 
@@ -172,6 +174,7 @@ function PlayInner() {
   useEffect(() => {
     (async () => {
       try {
+        setComp(comp);
         const m = await loadMeta();
         setMeta(m);
         if (shared) {
@@ -295,9 +298,10 @@ function PlayInner() {
         .map((p, i) => (p ? { d: p.decade, c: p.club, id: p.player.id, i } : null))
         .filter(Boolean),
     });
-    setShareUrl(`${window.location.origin}${BASE_PATH}/play/?mode=${m}&d=${payload}`);
+    const compQ = comp === "aflw" ? "&comp=aflw" : "";
+    setShareUrl(`${window.location.origin}${BASE_PATH}/play/?mode=${m}${compQ}&d=${payload}`);
     setChallengeUrl(
-      `${window.location.origin}${BASE_PATH}/play/?mode=${m}&eras=${finalEras.join(",")}` +
+      `${window.location.origin}${BASE_PATH}/play/?mode=${m}${compQ}&eras=${finalEras.join(",")}` +
         `&seed=${seed}&target=${result.wins}-${result.losses}&trating=${rating.toFixed(1)}`,
     );
     if (!isReplay) {
@@ -513,6 +517,7 @@ function PlayInner() {
           opponents={opponents}
           cultCount={cultCount}
           draftPct={draftPct}
+          comp={comp}
         />
       </main>
     );
@@ -587,7 +592,7 @@ function PlayInner() {
           {selPick && (
             <div className="mt-2 flex flex-col items-center gap-1 text-center">
               <p className="text-xs text-slate-300">
-                <b>{selPick.player.n}</b> · {selPick.club} {selPick.decade}s
+                <b>{selPick.player.n}</b> · {selPick.club} {eraLabel(selPick.decade, comp)}
                 {isCap ? ` · ${fmtSalary(selPick.player.s)}` : ""}
               </p>
               {isCap && lifelines > 0 && !inSwap && (
@@ -608,7 +613,7 @@ function PlayInner() {
             <div>
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-2xl font-black">
-                  Lifeline swap <span className="text-gold">{activeCombo.club} {activeCombo.decade}s</span>
+                  Lifeline swap <span className="text-gold">{activeCombo.club} {eraLabel(activeCombo.decade, comp)}</span>
                 </h2>
                 <button
                   onClick={() => { setSwapIndex(null); setSwapPool([]); }}
@@ -659,7 +664,7 @@ function PlayInner() {
                       <span className="flex-1" style={{ background: clubColors(activeCombo.club)[0] }} />
                       <span className="flex-1" style={{ background: clubColors(activeCombo.club)[1] }} />
                     </span>
-                    {activeCombo.club} <span className="text-gold">{activeCombo.decade}s</span>
+                    {activeCombo.club} <span className="text-gold">{eraLabel(activeCombo.decade, comp)}</span>
                   </h1>
                   <button
                     disabled={rerolls <= 0}
@@ -676,7 +681,7 @@ function PlayInner() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={`Search all ${activePool.length} ${activeCombo.club} players of the ${activeCombo.decade}s…`}
+                placeholder={`Search all ${activePool.length} ${activeCombo.club} players of the ${eraLabel(activeCombo.decade, comp)}…`}
                 className="mt-4 w-full rounded-xl border border-line bg-pitch-light px-4 py-2.5 text-sm outline-none placeholder:text-slate-600 focus:border-grass/60"
               />
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -786,7 +791,7 @@ function PlayInner() {
           >
             <div className="font-display text-2xl font-black">{pendingPlayer.n}</div>
             <div className="mt-0.5 text-xs text-slate-400">
-              {combo.club} · {combo.decade}s · natural {pendingPlayer.nat}
+              {combo.club} · {eraLabel(combo.decade, comp)} · natural {pendingPlayer.nat}
               {pendingPlayer.elig.length > 1 ? ` · plays ${pendingPlayer.elig.join("/")}` : ""}
               {isCap ? ` · ${fmtSalary(pendingPlayer.s)}` : ""}
             </div>

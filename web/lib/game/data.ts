@@ -3,41 +3,66 @@ import { Meta, PlayerEntry } from "./types";
 // inlined at build time; "/AFL-23-0" on GitHub Pages, "" elsewhere
 export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
-const playerCache = new Map<number, PlayerEntry[]>();
-let metaCache: Meta | null = null;
-let strengthsCache: Record<string, [number, string][]> | null = null;
+export type Comp = "afl" | "aflw";
+
+// The game runs one competition per session. The play flow calls setComp()
+// from the ?comp= param; AFLW loads parallel data files (aflw-*.json) that
+// share the AFL shape, so the whole engine is reused. AFL is the default.
+let COMP: Comp = "afl";
+export function setComp(c: Comp) {
+  COMP = c;
+}
+export function getComp(): Comp {
+  return COMP;
+}
+function prefix(): string {
+  return COMP === "aflw" ? "aflw-" : "";
+}
+/** Era label: AFL spins are decades ("1990s"), AFLW spins are single years ("2022"). */
+export function eraLabel(n: number, comp: Comp = COMP): string {
+  return comp === "aflw" ? `${n}` : `${n}s`;
+}
+
+const playerCache = new Map<string, PlayerEntry[]>();
+const metaCache = new Map<Comp, Meta>();
+const strengthsCache = new Map<Comp, Record<string, [number, string][]>>();
+const topRatingsCache = new Map<Comp, Record<string, TopPlayer[]>>();
 
 export async function loadMeta(): Promise<Meta> {
-  if (!metaCache) {
-    metaCache = await (await fetch(`${BASE_PATH}/data/meta.json`)).json();
+  if (!metaCache.has(COMP)) {
+    metaCache.set(COMP, await (await fetch(`${BASE_PATH}/data/${prefix()}meta.json`)).json());
   }
-  return metaCache!;
+  return metaCache.get(COMP)!;
 }
 
 export async function loadDecade(decade: number): Promise<PlayerEntry[]> {
-  if (!playerCache.has(decade)) {
-    const data = await (await fetch(`${BASE_PATH}/data/players-${decade}.json`)).json();
-    playerCache.set(decade, data);
+  const key = `${COMP}-${decade}`;
+  if (!playerCache.has(key)) {
+    const data = await (await fetch(`${BASE_PATH}/data/${prefix()}players-${decade}.json`)).json();
+    playerCache.set(key, data);
   }
-  return playerCache.get(decade)!;
+  return playerCache.get(key)!;
 }
 
 export async function loadStrengths(): Promise<Record<string, [number, string][]>> {
-  if (!strengthsCache) {
-    strengthsCache = await (await fetch(`${BASE_PATH}/data/strengths.json`)).json();
+  if (!strengthsCache.has(COMP)) {
+    strengthsCache.set(COMP, await (await fetch(`${BASE_PATH}/data/${prefix()}strengths.json`)).json());
   }
-  return strengthsCache!;
+  return strengthsCache.get(COMP)!;
 }
 
 export type TopPlayer = [string, number, string]; // [name, rating, club]
-let topRatingsCache: Record<string, TopPlayer[]> | null = null;
 
-/** top-100 players per decade — fuel for synthetic all-star opponents */
+/** top players per era — fuel for synthetic all-star opponents */
 export async function loadTopRatings(): Promise<Record<string, TopPlayer[]>> {
-  if (!topRatingsCache) {
-    topRatingsCache = await (await fetch(`${BASE_PATH}/data/topratings.json`)).json();
+  if (!topRatingsCache.has(COMP)) {
+    try {
+      topRatingsCache.set(COMP, await (await fetch(`${BASE_PATH}/data/${prefix()}topratings.json`)).json());
+    } catch {
+      topRatingsCache.set(COMP, {});
+    }
   }
-  return topRatingsCache!;
+  return topRatingsCache.get(COMP)!;
 }
 
 /** pool the selected decades into aligned, ascending values + labels */

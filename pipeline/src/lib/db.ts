@@ -52,6 +52,21 @@ CREATE TABLE IF NOT EXISTS aflw_matches (
   venue TEXT
 );
 
+CREATE TABLE IF NOT EXISTS aflw_player_games (
+  match_id TEXT NOT NULL,
+  season_key TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  player_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  team TEXT NOT NULL,            -- canonical club
+  position TEXT,                 -- on-day position code (FB, C, RK, FF, INT...)
+  gl REAL, kk REAL, hb REAL, di REAL, mk REAL, tk REAL, cp REAL,
+  i5 REAL, mi5 REAL, cm REAL, ho REAL, op REAL, cl REAL, r5 REAL,
+  ic REAL, ga REAL, mg REAL, rp REAL,
+  PRIMARY KEY (match_id, player_id)
+);
+CREATE INDEX IF NOT EXISTS idx_aflwpg_season ON aflw_player_games(season_key);
+
 CREATE TABLE IF NOT EXISTS brownlow (
   year INTEGER NOT NULL,
   player_name TEXT NOT NULL,       -- "First Last" (footywire format)

@@ -72,6 +72,7 @@ export default function ResultView({
   opponents,
   cultCount,
   draftPct,
+  comp = "afl",
 }: {
   mode: Mode;
   roster: (Pick | null)[];
@@ -91,6 +92,7 @@ export default function ResultView({
   opponents?: OppTeam[];
   cultCount?: number;
   draftPct?: number | null;
+  comp?: "afl" | "aflw";
 }) {
   const [copied, setCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
@@ -111,7 +113,7 @@ export default function ResultView({
     const ok = await submitScore({
       name: ladderName.trim(), wins: sim.wins, losses: sim.losses,
       rating: Math.round(teamRating * 10) / 10,
-      flag: flagWon, mode, fin: finResult,
+      flag: flagWon, mode, fin: finResult, comp,
       ...(daily ? { daily: todayMelbourne() } : {}),
     });
     setLadderState(ok ? "done" : "failed");
@@ -568,7 +570,7 @@ export default function ResultView({
           {copied ? "COPIED!" : "COPY LINK"}
         </button>
         <Link
-          href={daily ? "/" : `/play?mode=${mode}&eras=${eras.join(",")}&r=${Date.now().toString(36)}`}
+          href={daily ? (comp === "aflw" ? "/aflw" : "/") : `/play?mode=${mode}${comp === "aflw" ? "&comp=aflw" : ""}&eras=${eras.join(",")}&r=${Date.now().toString(36)}`}
           className="rounded-xl border border-line px-6 py-3 font-display text-lg font-black text-slate-300 transition hover:border-grass/50"
         >
           PLAY AGAIN

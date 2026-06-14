@@ -38,6 +38,18 @@ function corsHeaders(req: Request): Record<string, string> {
 
 const byBest = (a: Entry, b: Entry) => b.w - a.w || b.r - a.r || a.t - b.t;
 
+// AFL keeps its original key names (backward-compatible); AFLW is namespaced so
+// the two competitions have completely separate boards.
+function comp(v: unknown): "afl" | "aflw" {
+  return v === "aflw" ? "aflw" : "afl";
+}
+function dailyKey(c: "afl" | "aflw", daily: string): string {
+  return c === "afl" ? `d:${daily}` : `d:${c}:${daily}`;
+}
+function clubKey(c: "afl" | "aflw"): string {
+  return c === "afl" ? "club230" : `club230:${c}`;
+}
+
 async function addTo(env: Env, key: string, entry: Entry, max = 100): Promise<void> {
   const cur = JSON.parse((await env.BOARD.get(key)) ?? "[]") as Entry[];
   cur.push(entry);
@@ -74,6 +86,7 @@ export default {
       const rating = Math.round(Number(body.rating) * 10) / 10;
       const mode = String(body.mode ?? "").slice(0, 12);
       const daily = String(body.daily ?? "");
+      const c = comp(body.comp);
       if (!name || !Number.isFinite(wins) || wins < 0 || wins > 23 || losses < 0 || losses > 23 ||
           !Number.isFinite(rating) || rating < 0 || rating > 100) {
         return new Response(`{"error":"invalid"}`, { status: 400, headers });
@@ -82,22 +95,24 @@ export default {
       const entry: Entry = {
         n: name, w: wins, l: losses, r: rating, f: Boolean(body.flag), m: mode, t: Date.now(), fin,
       };
-      if (/^\d{4}-\d{2}-\d{2}$/.test(daily)) await addTo(env, `d:${daily}`, entry);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(daily)) await addTo(env, dailyKey(c, daily), entry);
       // the 23-0 Club: perfect seasons only, newest first
       if (wins === 23 && losses === 0 && mode !== "spoon" && mode !== "gauntlet") {
-        const cur = JSON.parse((await env.BOARD.get("club230")) ?? "[]") as Entry[];
+        const ck = clubKey(c);
+        const cur = JSON.parse((await env.BOARD.get(ck)) ?? "[]") as Entry[];
         cur.unshift(entry);
-        await env.BOARD.put("club230", JSON.stringify(cur.slice(0, 200)));
+        await env.BOARD.put(ck, JSON.stringify(cur.slice(0, 200)));
       }
       return new Response(`{"ok":true}`, { headers });
     }
 
     if (req.method === "GET" && url.pathname === "/board") {
+      const c = comp(url.searchParams.get("comp"));
       const d = url.searchParams.get("d") ?? "";
       const daily = /^\d{4}-\d{2}-\d{2}$/.test(d)
-        ? JSON.parse((await env.BOARD.get(`d:${d}`)) ?? "[]")
+        ? JSON.parse((await env.BOARD.get(dailyKey(c, d))) ?? "[]")
         : [];
-      const club = JSON.parse((await env.BOARD.get("club230")) ?? "[]");
+      const club = JSON.parse((await env.BOARD.get(clubKey(c))) ?? "[]");
       // `alltime` kept for clients still running the previous page bundle
       return new Response(JSON.stringify({ daily, club, alltime: club }), {
         headers: { ...headers, "Cache-Control": "public, max-age=30" },

@@ -25,7 +25,7 @@ export function setCoachName(n: string) {
 
 export async function submitScore(s: {
   name: string; wins: number; losses: number; rating: number;
-  flag: boolean; mode: string; fin?: string; daily?: string;
+  flag: boolean; mode: string; fin?: string; daily?: string; comp?: "afl" | "aflw";
 }): Promise<boolean> {
   if (!LEADERBOARD_URL) return false;
   try {
@@ -40,10 +40,13 @@ export async function submitScore(s: {
   }
 }
 
-export async function fetchBoard(daily: string): Promise<{ daily: BoardEntry[]; club: BoardEntry[] } | null> {
+export async function fetchBoard(
+  daily: string,
+  comp: "afl" | "aflw" = "afl",
+): Promise<{ daily: BoardEntry[]; club: BoardEntry[] } | null> {
   if (!LEADERBOARD_URL) return null;
   try {
-    const res = await fetch(`${LEADERBOARD_URL}/board?d=${daily}`);
+    const res = await fetch(`${LEADERBOARD_URL}/board?d=${daily}&comp=${comp}`);
     if (!res.ok) return null;
     const data = await res.json();
     return { daily: data.daily ?? [], club: data.club ?? [] };

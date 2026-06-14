@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { db } from "./lib/db.js";
 import { canonicalClub } from "./lib/clubs.js";
+import { buildAflwPlayers } from "./compute/aflw-players.js";
 import { computeRatings, PlayerDecade } from "./compute/ratings.js";
 import { computeTeamStrengths } from "./compute/team-strengths.js";
 import {
@@ -317,6 +318,47 @@ export function exportData() {
       }),
     );
     console.log(`AFLW: exported ${seasonKeys.length} seasons (current ${labelOf.get(currentKey)})`);
+
+    // ---- AFLW game data: per-season player ratings + meta + strengths ----
+    const aflwPlayers = buildAflwPlayers();
+    if (aflwPlayers.years.length > 0) {
+      const aflwTop: Record<string, [string, number, string][]> = {};
+      for (const year of aflwPlayers.years) {
+        writeFileSync(join(OUT_DIR, `aflw-players-${year}.json`), JSON.stringify(aflwPlayers.byYear[year]));
+        aflwTop[year] = aflwPlayers.byYear[year]
+          .slice(0, 100)
+          .map((p) => [p.n, Math.max(p.r.DEF, p.r.MID, p.r.RUC, p.r.FWD), Object.keys(p.c)[0] ?? ""] as [string, number, string]);
+      }
+      writeFileSync(join(OUT_DIR, "aflw-topratings.json"), JSON.stringify(aflwTop));
+      // strengths per game-year (merging the 2022 doubleheader), from the ladders
+      const aflwStrengths: Record<string, [number, string][]> = {};
+      for (const key of seasonKeys) {
+        const y = yearOf.get(key)!;
+        for (const r of aflwLadders[key]) {
+          if (r.p === 0) continue;
+          const winRate = (r.w + 0.5 * r.d) / r.p;
+          const strength = Math.round((0.7 * winRate + 0.3 * Math.min(1, r.pct / 200)) * 1000) / 1000;
+          (aflwStrengths[y] ??= []).push([strength, `${y} ${r.team}`]);
+        }
+      }
+      for (const y of Object.keys(aflwStrengths)) aflwStrengths[y].sort((a, b) => a[0] - b[0]);
+      writeFileSync(join(OUT_DIR, "aflw-strengths.json"), JSON.stringify(aflwStrengths));
+
+      const capByYear: Record<string, number> = {};
+      for (const y of aflwPlayers.years) capByYear[y] = 21_200_000;
+      writeFileSync(
+        join(OUT_DIR, "aflw-meta.json"),
+        JSON.stringify({
+          generatedAt: new Date().toISOString(),
+          decades: aflwPlayers.years, // game treats these as the spin "eras" (years)
+          clubsByDecade: aflwPlayers.clubsByYear,
+          capByDecade: capByYear,
+          salary: { min: SALARY_MIN, top: SALARY_TOP, gamma: SALARY_GAMMA },
+          sources: ["AFL.com.au"],
+        }),
+      );
+      console.log(`AFLW: exported player pools for ${aflwPlayers.years.length} seasons`);
+    }
   }
 
   // ---- top players per decade (synthetic all-star opponents) ----

@@ -236,3 +236,75 @@ export async function scrapeAflw(force = false): Promise<void> {
   const total = (db.prepare(`SELECT COUNT(*) n FROM aflw_matches`).get() as { n: number }).n;
   console.log(`AFLW: ${total} matches stored`);
 }
+
+interface MatchPlayerStat {
+  player: { player: { position: string; player: { playerId: string; playerName: { givenName: string; surname: string } } } };
+  teamId: string;
+  playerStats: { stats: Record<string, number | null | { totalClearances?: number }> };
+}
+
+/**
+ * Per-match AFLW player stats (the season-aggregate stats endpoint isn't
+ * comp-scoped, so we aggregate match by match — fitzRoy does the same).
+ * Stores one row per (match, player) in aflw_player_games.
+ */
+export async function scrapeAflwPlayers(force = false): Promise<void> {
+  const matches = db
+    .prepare(`SELECT match_id, season_key, year, team1, team2 FROM aflw_matches ORDER BY year, rowid`)
+    .all() as { match_id: string; season_key: string; year: number; team1: string; team2: string }[];
+  console.log(`AFLW players: ${matches.length} matches to read`);
+
+  const insert = db.prepare(`
+    INSERT OR REPLACE INTO aflw_player_games
+      (match_id, season_key, year, player_id, name, team, position,
+       gl, kk, hb, di, mk, tk, cp, i5, mi5, cm, ho, op, cl, r5, ic, ga, mg, rp)
+    VALUES (@match_id, @season_key, @year, @player_id, @name, @team, @position,
+       @gl, @kk, @hb, @di, @mk, @tk, @cp, @i5, @mi5, @cm, @ho, @op, @cl, @r5, @ic, @ga, @mg, @rp)
+  `);
+  const insertMany = db.transaction((rows: Record<string, unknown>[]) => {
+    for (const r of rows) insert.run(r);
+  });
+
+  const num = (v: number | null | undefined) => (typeof v === "number" ? v : 0);
+  let done = 0;
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    // current-year matches refresh; older are cache-stable
+    const live = force && m.year >= new Date().getFullYear() - 1;
+    let data: { homeTeamPlayerStats?: MatchPlayerStat[]; awayTeamPlayerStats?: MatchPlayerStat[] };
+    try {
+      data = await apiGet(`https://api.afl.com.au/cfs/afl/playerStats/match/${m.match_id}`, live);
+    } catch {
+      continue; // skip a match that won't load rather than abort the run
+    }
+    const rows: Record<string, unknown>[] = [];
+    const take = (list: MatchPlayerStat[] | undefined, team: string) => {
+      for (const ps of list ?? []) {
+        const p = ps.player.player;
+        const s = ps.playerStats.stats;
+        const cl = s.clearances as { totalClearances?: number } | null;
+        rows.push({
+          match_id: m.match_id, season_key: m.season_key, year: m.year,
+          player_id: p.player.playerId,
+          name: `${p.player.playerName.givenName} ${p.player.playerName.surname}`.trim(),
+          team, position: p.position ?? null,
+          gl: num(s.goals as number), kk: num(s.kicks as number), hb: num(s.handballs as number),
+          di: num(s.disposals as number), mk: num(s.marks as number), tk: num(s.tackles as number),
+          cp: num(s.contestedPossessions as number), i5: num(s.inside50s as number),
+          mi5: num(s.marksInside50 as number), cm: num(s.contestedMarks as number),
+          ho: num(s.hitouts as number), op: num(s.onePercenters as number),
+          cl: num(cl?.totalClearances), r5: num(s.rebound50s as number),
+          ic: num(s.intercepts as number), ga: num(s.goalAssists as number),
+          mg: num(s.metresGained as number), rp: num(s.ratingPoints as number),
+        });
+      }
+    };
+    take(data.homeTeamPlayerStats, m.team1);
+    take(data.awayTeamPlayerStats, m.team2);
+    insertMany(rows);
+    done++;
+    if (done % 100 === 0) console.log(`  …${done}/${matches.length} matches`);
+  }
+  const n = (db.prepare(`SELECT COUNT(DISTINCT player_id) n FROM aflw_player_games`).get() as { n: number }).n;
+  console.log(`AFLW players: ${done} matches read, ${n} distinct players`);
+}

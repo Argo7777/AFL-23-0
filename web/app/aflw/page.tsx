@@ -37,11 +37,34 @@ export default function AflwHub() {
         <span className="inline-block h-9 w-1.5 rounded-sm bg-[#ff5e44]" />
         <div>
           <h1 className="font-display text-3xl font-black sm:text-4xl">AFLW</h1>
-          <p className="text-sm text-slate-400">Women&apos;s AFL — ladders, results &amp; premiers since 2017.</p>
+          <p className="text-sm text-slate-400">Women&apos;s AFL — build a team, chase 23-0, plus ladders &amp; results since 2017.</p>
         </div>
       </div>
 
-      <section className="mt-6">
+      {/* play AFLW 23-0 — per-season ratings (2017–2025) */}
+      <section className="mt-6 rounded-2xl border border-[#ff5e44]/40 bg-[#ff5e44]/5 p-5 text-center">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[#ff8d79]">The game · AFLW edition</p>
+        <p className="mx-auto mt-1 max-w-md text-sm text-slate-300">
+          Spin a club and <b>season</b>, draft your side from real AFLW stars rated on that year&apos;s form, and chase a perfect record.
+        </p>
+        <div className="mt-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Link
+            href="/play?comp=aflw&mode=classic5"
+            className="font-display w-full max-w-xs rounded-xl bg-[#ff5e44] px-10 py-4 text-2xl font-black text-white transition hover:scale-105 hover:bg-[#ff7a63] sm:w-auto"
+          >
+            START THE SPIN ▸
+          </Link>
+          <Link
+            href="/play?comp=aflw&mode=full23"
+            className="font-display w-full max-w-xs rounded-xl border border-[#ff5e44]/60 px-8 py-4 text-lg font-black text-[#ff8d79] transition hover:bg-[#ff5e44]/10 sm:w-auto"
+          >
+            FULL 23
+          </Link>
+        </div>
+        <p className="mt-2 text-xs text-slate-600">Separate AFLW leaderboard · 2017–2025 seasons</p>
+      </section>
+
+      <section className="mt-8">
         <div className="flex items-baseline justify-between">
           <h2 className="font-display text-xl font-black">{cur.label} Season <span className="text-sm text-slate-500">· Round {cur.round}</span></h2>
           <Link href="/aflw/ladder" className="text-xs font-semibold text-[#ff8d79] hover:underline">full ladder →</Link>
