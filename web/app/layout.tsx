@@ -70,6 +70,16 @@ const jsonLd = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en-AU">
+      <head>
+        {/* Google AdSense — in <head> so the AdSense crawler verifies the site
+            and page-level / Auto ads can run. */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2087141992057731"
+          crossOrigin="anonymous"
+        />
+        <meta name="google-adsense-account" content="ca-pub-2087141992057731" />
+      </head>
       <body className="antialiased">
         <SisterSites active="afl" />
         <NavBar />
@@ -84,12 +94,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           defer
           src="https://static.cloudflareinsights.com/beacon.min.js"
           data-cf-beacon='{"token": "e331b8f3ea0642bfa98ab6e67114f860"}'
-        />
-        {/* Google AdSense */}
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2087141992057731"
-          crossOrigin="anonymous"
         />
       </body>
     </html>

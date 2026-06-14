@@ -15,13 +15,19 @@ export default function Footer() {
       </a>
       <p className="mt-4 text-xs text-slate-500">
         <Link href="/" className="hover:text-ice hover:underline">play</Link> ·{" "}
-        <Link href="/greats" className="hover:text-ice hover:underline">the greats</Link> ·{" "}
         <Link href="/ladder" className="hover:text-ice hover:underline">ladder</Link> ·{" "}
-        <Link href="/me" className="hover:text-ice hover:underline">my career</Link> ·{" "}
+        <Link href="/greats" className="hover:text-ice hover:underline">the greats</Link> ·{" "}
+        <Link href="/aflw" className="hover:text-ice hover:underline">AFLW</Link> ·{" "}
         <Link href="/premierships" className="hover:text-ice hover:underline">premierships</Link>
       </p>
+      <p className="mt-2 text-xs text-slate-500">
+        <Link href="/about" className="hover:text-ice hover:underline">about</Link> ·{" "}
+        <Link href="/contact" className="hover:text-ice hover:underline">contact</Link> ·{" "}
+        <Link href="/privacy" className="hover:text-ice hover:underline">privacy</Link>
+      </p>
       <p className="mt-2 text-[11px] text-slate-600">
-        AFL 23-0 — a fan project. Ratings derived from real data (afltables.com, footywire.com).
+        AFL 23-0 — an independent fan project, not affiliated with the AFL. Ratings derived from real
+        data (afltables.com, footywire.com).
       </p>
     </footer>
   );

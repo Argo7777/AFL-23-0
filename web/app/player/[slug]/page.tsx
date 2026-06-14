@@ -122,6 +122,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
         </div>
       )}
 
+      <AdSlot slot={AD_SLOTS.content} className="mt-6" />
+
       {amazonBooksLink(c.name) && (
         <a
           href={amazonBooksLink(c.name)!}
