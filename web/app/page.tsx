@@ -88,21 +88,55 @@ export default function Home() {
   const eraParam = meta ? `&eras=${[...eras].sort((a, b) => a - b).join(",")}` : "";
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10">
-      <header className="text-center">
+    <main className="mx-auto max-w-4xl px-4 py-6">
+      {/* cross-promo: the soccer sibling */}
+      <div className="flex justify-center">
+        <a
+          href="https://footballinvincibles.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-full border border-ice/40 bg-ice/5 px-4 py-1.5 text-xs font-semibold text-ice transition hover:bg-ice/10"
+        >
+          ⚽ Into soccer? Try the Football version → Football Invincibles
+        </a>
+      </div>
+
+      <header className="mt-5 text-center">
         <div className="relative inline-block">
           <div className="hero-glow" aria-hidden />
-          <div className="font-display relative text-7xl font-black tracking-tight text-grass">
+          <div className="font-display relative text-6xl font-black tracking-tight text-grass sm:text-7xl">
             23<span className="text-slate-500">–</span>0
           </div>
         </div>
         <p className="mt-1 text-sm uppercase tracking-[0.3em] text-slate-400">
           AFL all-era edition
         </p>
-        <p className="mx-auto mt-4 max-w-xl text-slate-300">
-          Spin a club and an era from 130 years of VFL/AFL footy, pick a player,
-          build your side — then see if it could run a season undefeated.
-          Every rating is derived from real career stats and honours.
+        <p className="mx-auto mt-3 max-w-xl text-sm text-slate-300 sm:text-base">
+          Spin a club and era from 130 years of footy, draft your side, and chase a
+          perfect 23-0 season.
+        </p>
+
+        {/* primary CTAs — reachable without scrolling */}
+        <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Link
+            href={`/play?mode=${mode}${eraParam}`}
+            className="font-display w-full max-w-xs rounded-xl bg-grass px-10 py-4 text-2xl font-black text-pitch transition hover:scale-105 hover:bg-lime-300 sm:w-auto"
+          >
+            START THE SPIN ▸
+          </Link>
+          <Link
+            href="/play?daily=1"
+            className={`font-display w-full max-w-xs rounded-xl px-8 py-4 text-lg font-black transition sm:w-auto ${
+              daily
+                ? "border border-gold/50 text-gold hover:bg-gold/10"
+                : "border-2 border-gold bg-gold/10 text-gold hover:bg-gold/20"
+            }`}
+          >
+            {daily ? `DAILY #${dailyNumber()} ✓` : `🏆 DAILY #${dailyNumber()}`}
+          </Link>
+        </div>
+        <p className="mt-2 text-xs text-slate-600">
+          mode &amp; eras configurable below · {meta?.decades.length ?? 14} decades
         </p>
       </header>
 
@@ -122,41 +156,18 @@ export default function Home() {
         ))}
       </section>
 
-      {/* daily challenge */}
-      <section className="mt-8 rounded-2xl border border-gold/60 bg-card p-5 shadow-[0_0_24px_-8px] shadow-gold/40">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-gold">
-              one attempt · same spins for everyone · all 14 decades
-            </div>
-            <div className="font-display mt-1 text-2xl font-black">
-              Daily Challenge <span className="text-gold">#{dailyNumber()}</span>
-            </div>
-            {daily ? (
-              <p className="mt-1 text-sm text-slate-300">
-                Today: <b className="text-grass">{daily.wins}-{daily.losses}</b>
-                {daily.flag ? " 🏆" : ""} — back tomorrow for #{dailyNumber() + 1}.
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-slate-400">
-                Five picks, the whole world gets the same clubs and eras. Post your record.
-              </p>
-            )}
-          </div>
-          <Link
-            href="/play?daily=1"
-            className={`font-display rounded-xl px-6 py-3 text-lg font-black transition ${
-              daily
-                ? "border border-line text-slate-400 hover:border-gold/50"
-                : "bg-gold text-pitch hover:scale-105"
-            }`}
-          >
-            {daily ? "PLAY AGAIN (UNRANKED)" : "PLAY TODAY'S"}
-          </Link>
-        </div>
-      </section>
+      {daily && (
+        <p className="mt-6 text-center text-sm text-slate-400">
+          Today&apos;s daily: <b className="text-grass">{daily.wins}-{daily.losses}</b>
+          {daily.flag ? " 🏆" : ""} — back tomorrow for #{dailyNumber() + 1}.
+        </p>
+      )}
 
-      <section className="mt-10 grid gap-4 sm:grid-cols-3">
+      {/* choose your mode (drives the START button above) */}
+      <h2 className="mt-10 text-center text-xs uppercase tracking-[0.3em] text-slate-500">
+        choose a mode, then hit start
+      </h2>
+      <section className="mt-3 grid gap-4 sm:grid-cols-3">
         {MODES.map((m) => (
           <button
             key={m.id}

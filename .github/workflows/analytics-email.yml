@@ -1,0 +1,35 @@
+name: Daily analytics email
+
+on:
+  schedule:
+    # 09:00 UTC = ~7pm Melbourne (end of the AU day)
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the analytics report
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_ANALYTICS_TOKEN }}
+          CF_ACCOUNT_ID: ad879eaec229897ce1b8d1d42ce02f19
+          CF_SITE_TAG: ${{ secrets.CF_SITE_TAG }}
+        run: node scripts/analytics-report.mjs
+      - name: Email the report
+        uses: dawidd6/action-send-mail@v4
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "AFL 23-0 — daily analytics"
+          to: ${{ secrets.REPORT_TO }}
+          from: AFL 23-0 Analytics <${{ secrets.GMAIL_USER }}>
+          html_body: file://report.html
+          body: file://report.txt
