@@ -11,6 +11,7 @@ import { coachName, LEADERBOARD_URL, setCoachName, submitScore } from "@/lib/gam
 import { FINALS_QUALIFY_WINS } from "@/lib/game/finals";
 import FinalsCampaign from "@/components/FinalsCampaign";
 import Confetti from "@/components/Confetti";
+import AdSlot, { AD_SLOTS } from "@/components/AdSlot";
 import TeamField from "@/components/TeamField";
 
 /** median decade of the squad drives a film-stock tint on the oval */
@@ -473,6 +474,9 @@ export default function ResultView({
           )}
         </div>
       )}
+
+      {/* sponsor slot — well below the record and finals, never blocks play */}
+      <AdSlot slot={AD_SLOTS.result} className="mt-8" />
 
       {/* opposing line-up viewer */}
       {oppView && (

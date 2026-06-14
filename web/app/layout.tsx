@@ -79,6 +79,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           src="https://static.cloudflareinsights.com/beacon.min.js"
           data-cf-beacon='{"token": "e331b8f3ea0642bfa98ab6e67114f860"}'
         />
+        {/* Google AdSense */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2087141992057731"
+          crossOrigin="anonymous"
+        />
       </body>
     </html>
   );

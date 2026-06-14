@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BASE_PATH, loadMeta } from "@/lib/game/data";
+import AdSlot, { AD_SLOTS } from "@/components/AdSlot";
 import {
   Badge, badges, dailyNumber, GameRecord, readProfile, summary, todayMelbourne, todaysDaily,
 } from "@/lib/game/profile";
@@ -327,6 +328,9 @@ export default function Home() {
           </p>
         </section>
       )}
+
+      {/* sponsor slot — between the games grid and the modes above it */}
+      <AdSlot slot={AD_SLOTS.home} className="mt-8" />
 
       {/* more games */}
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
