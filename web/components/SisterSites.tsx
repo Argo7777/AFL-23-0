@@ -12,7 +12,7 @@ const SITES = [
   { key: "f1", label: "F1 Slam", href: "https://f1slam.com" },
 ];
 
-export default function SisterSites({ active }: { active: "afl" | "nrl" | "football" }) {
+export default function SisterSites({ active }: { active: "afl" | "nrl" | "football" | "mlb" | "nba" | "f1" }) {
   return (
     <div
       role="navigation"
