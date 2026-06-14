@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { careerBySlug, notableCareers } from "@/lib/playerdb";
 import { honours } from "@/lib/game/honours";
 import { clubColors } from "@/lib/game/clubColors";
+import AdSlot from "@/components/AdSlot";
+import { AD_SLOTS } from "@/lib/ads";
 
 export const dynamic = "force-static";
 export const dynamicParams = false;
@@ -89,6 +91,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
           })}
         </div>
       </div>
+
+      <AdSlot slot={AD_SLOTS.content} className="mt-6" />
 
       {sea.length > 0 && (
         <div className="mt-4 rounded-2xl border border-line bg-pitch-light p-4">

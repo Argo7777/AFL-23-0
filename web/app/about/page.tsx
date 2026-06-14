@@ -1,4 +1,6 @@
 import Link from "next/link";
+import AdSlot from "@/components/AdSlot";
+import { AD_SLOTS } from "@/lib/ads";
 
 export const metadata = {
   title: "About the numbers",
@@ -102,7 +104,8 @@ export default function About() {
           ))}
         </section>
       ))}
-      <p className="mt-10 text-xs text-slate-500">
+      <AdSlot slot={AD_SLOTS.content} className="mt-8" />
+      <p className="mt-8 text-xs text-slate-500">
         Data: afltables.com · footywire.com · wikidata.org. Access patterns follow the
         open-source fitzRoy project. This is a fan project — stats belong to their sources.
       </p>

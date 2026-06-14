@@ -1,18 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { ADSENSE_CLIENT } from "@/lib/ads";
 
-export const ADSENSE_CLIENT = "ca-pub-2087141992057731";
-
-/**
- * After AdSense approves the site, create two display ad units in the AdSense
- * dashboard (Ads → By ad unit → Display ads) and paste their slot ids here.
- * Until then both stay "" and no ad boxes render anywhere.
- */
-export const AD_SLOTS = {
-  home: "5789788385", // "Home" unit — between sections on the home page
-  result: "6838809461", // "Result" unit — result screen, below the record
-};
+// re-export so existing imports keep working
+export { ADSENSE_CLIENT, AD_SLOTS } from "@/lib/ads";
 
 /**
  * A single responsive AdSense unit. Renders nothing until this unit's slot id

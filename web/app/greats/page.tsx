@@ -6,6 +6,7 @@ import { loadDecade, loadMeta } from "@/lib/game/data";
 import { clubColors } from "@/lib/game/clubColors";
 import { honours } from "@/components/PlayerCard";
 import PlayerSheet from "@/components/PlayerSheet";
+import AdSlot, { AD_SLOTS } from "@/components/AdSlot";
 import { PlayerEntry } from "@/lib/game/types";
 
 export default function GreatsPage() {
@@ -125,6 +126,8 @@ export default function GreatsPage() {
       </div>
 
       {sheet && <PlayerSheet p={sheet} onClose={() => setSheet(null)} />}
+
+      <AdSlot slot={AD_SLOTS.content} className="mt-6" />
 
       <p className="mt-6 text-center">
         <Link
