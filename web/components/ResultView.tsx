@@ -12,6 +12,7 @@ import { FINALS_QUALIFY_WINS } from "@/lib/game/finals";
 import FinalsCampaign from "@/components/FinalsCampaign";
 import Confetti from "@/components/Confetti";
 import AdSlot, { AD_SLOTS } from "@/components/AdSlot";
+import { KOFI_URL } from "@/lib/affiliate";
 import TeamField from "@/components/TeamField";
 
 /** median decade of the squad drives a film-stock tint on the oval */
@@ -581,6 +582,16 @@ export default function ResultView({
       </div>
       <p className="mt-3 text-center text-xs text-slate-500">
         The share image works anywhere — Instagram stories, X, Facebook, group chats.
+      </p>
+      <p className="mt-4 text-center">
+        <a
+          href={KOFI_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-gold/80 hover:text-gold hover:underline"
+        >
+          ☕ Enjoying 23-0? Shout the coach a beer →
+        </a>
       </p>
     </div>
   );

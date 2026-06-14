@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import SisterSites from "@/components/SisterSites";
+import Footer from "@/components/Footer";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -71,6 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         <SisterSites active="afl" />
         {children}
+        <Footer />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

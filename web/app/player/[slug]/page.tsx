@@ -6,6 +6,7 @@ import { honours } from "@/lib/game/honours";
 import { clubColors } from "@/lib/game/clubColors";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
+import { amazonBooksLink } from "@/lib/affiliate";
 
 export const dynamic = "force-static";
 export const dynamicParams = false;
@@ -112,6 +113,17 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
             ))}
           </div>
         </div>
+      )}
+
+      {amazonBooksLink(c.name) && (
+        <a
+          href={amazonBooksLink(c.name)!}
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          className="mt-6 block rounded-xl border border-line bg-pitch-light px-4 py-3 text-center text-sm text-slate-300 transition hover:border-gold/50"
+        >
+          📚 Books about <b className="text-slate-100">{c.name}</b> on Amazon →
+        </a>
       )}
 
       <p className="mt-6 text-center">
