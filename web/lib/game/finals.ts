@@ -7,8 +7,14 @@ export const FINALS_STAGES = [
   "Grand Final",
 ] as const;
 
-/** make finals with a winning September-worthy record */
+/** make finals with a winning September-worthy record (AFL, 23-game season) */
 export const FINALS_QUALIFY_WINS = 13;
+
+/** finals cutoff by season length — AFLW's 12-game season tops out at 12 wins,
+ *  so its threshold must be lower (≈ top 6). */
+export function finalsQualifyWins(seasonGames: number): number {
+  return seasonGames <= 14 ? 7 : 13;
+}
 
 /**
  * Per-final win probability, tuned so the premiership is as rare as 23-0:

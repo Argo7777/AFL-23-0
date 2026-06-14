@@ -96,8 +96,9 @@ export default {
         n: name, w: wins, l: losses, r: rating, f: Boolean(body.flag), m: mode, t: Date.now(), fin,
       };
       if (/^\d{4}-\d{2}-\d{2}$/.test(daily)) await addTo(env, dailyKey(c, daily), entry);
-      // the 23-0 Club: perfect seasons only, newest first
-      if (wins === 23 && losses === 0 && mode !== "spoon" && mode !== "gauntlet") {
+      // the perfect-season Club: 23-0 (AFL) or 12-0 (AFLW), newest first
+      const perfectWins = c === "aflw" ? 12 : 23;
+      if (wins === perfectWins && losses === 0 && mode !== "spoon" && mode !== "gauntlet") {
         const ck = clubKey(c);
         const cur = JSON.parse((await env.BOARD.get(ck)) ?? "[]") as Entry[];
         cur.unshift(entry);

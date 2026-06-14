@@ -61,7 +61,30 @@ export default function AflwHub() {
             FULL 23
           </Link>
         </div>
-        <p className="mt-2 text-xs text-slate-600">Separate AFLW leaderboard · 2017–2025 seasons</p>
+        <p className="mt-2 text-xs text-slate-600">Separate AFLW leaderboard · 2017–2025 seasons · 12-0 is perfect</p>
+      </section>
+
+      {/* every game mode, in AFLW */}
+      <section className="mt-6">
+        <h2 className="font-display text-sm font-black uppercase tracking-wide text-[#ff8d79]">Game modes · AFLW</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {[
+            ["classic5", "Classic 5", "Five spins, five picks — chase a perfect 12-0."],
+            ["full23", "Full 23", "Draft a full match-day side from real AFLW seasons."],
+            ["cap23", "Salary Cap 23", "Full squad under a cap — spend like a list manager."],
+            ["gauntlet", "The Gauntlet", "Beat every AFLW season's best in a best-of-three."],
+            ["spoon", "Wooden Spoon", "Build the worst side and chase a perfect 0-12."],
+          ].map(([mode, name, desc]) => (
+            <Link
+              key={mode}
+              href={`/play?comp=aflw&mode=${mode}`}
+              className="rounded-2xl border border-line bg-pitch-light p-4 transition hover:border-[#ff5e44]/50 hover:bg-card"
+            >
+              <div className="font-display text-lg font-black text-slate-100">{name}</div>
+              <p className="mt-1 text-sm text-slate-400">{desc}</p>
+            </Link>
+          ))}
+        </div>
       </section>
 
       <section className="mt-8">

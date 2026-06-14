@@ -285,7 +285,9 @@ function PlayInner() {
     const opps = m === "spoon"
       ? null
       : buildOpponents(await loadTopRatings(), finalEras, filled.length, simSeed);
-    const result = simulateSeason(rating, values, simSeed, opps, labels);
+    const result = simulateSeason(rating, values, simSeed, opps, labels, 10_000, {
+      seasonGames: comp === "aflw" ? 12 : 23,
+    });
     setSim(result);
     setOppLabels(labels);
     setOpponents(opps ?? []);
@@ -308,7 +310,7 @@ function PlayInner() {
       const earned = recordGame({
         t: Date.now(), mode: m, wins: result.wins, losses: result.losses,
         flag: false, // upgraded by flagLastGame() if they win the finals
-        perfect: result.wins === 23,
+        perfect: result.wins === (comp === "aflw" ? 12 : 23),
         rating: Math.round(rating * 10) / 10, eras: finalEras,
         ...(isDaily ? { daily: todayMelbourne() } : {}),
       });

@@ -8,7 +8,7 @@ import { CULT_BOOST } from "@/lib/game/cultHeroes";
 import { buildShareCard } from "@/lib/game/shareCard";
 import { Badge, dailyNumber, flagLastGame, todayMelbourne } from "@/lib/game/profile";
 import { coachName, LEADERBOARD_URL, setCoachName, submitScore } from "@/lib/game/leaderboard";
-import { FINALS_QUALIFY_WINS } from "@/lib/game/finals";
+import { finalsQualifyWins } from "@/lib/game/finals";
 import FinalsCampaign from "@/components/FinalsCampaign";
 import Confetti from "@/components/Confetti";
 import AdSlot, { AD_SLOTS } from "@/components/AdSlot";
@@ -120,11 +120,13 @@ export default function ResultView({
     if (ok) setPostedFin(finResult);
   }
   const picks = roster.filter((p): p is Pick => p !== null);
-  const perfect = spoon ? sim.wins === 0 : sim.wins === 23;
+  const seasonGames = comp === "aflw" ? 12 : 23;
+  const qualifyWins = finalsQualifyWins(seasonGames);
+  const perfect = spoon ? sim.wins === 0 : sim.wins === seasonGames;
   const shownWins = useCountUp(sim.wins);
   const shownLosses = useCountUp(sim.losses);
   const maxDist = Math.max(...sim.distribution);
-  const finalsEligible = !spoon && mode !== "gauntlet" && sim.wins >= FINALS_QUALIFY_WINS;
+  const finalsEligible = !spoon && mode !== "gauntlet" && sim.wins >= qualifyWins;
 
   const targetWins = targetRecord ? Number(targetRecord.split("-")[0]) : null;
   const beatTarget = targetWins != null ? sim.wins - targetWins : null;
@@ -342,7 +344,7 @@ export default function ResultView({
         ) : (
           !spoon && mode !== "gauntlet" && (
             <p className="mt-4 text-sm text-slate-500">
-              {sim.wins}-{sim.losses} misses September — {FINALS_QUALIFY_WINS}+ wins books a finals berth.
+              {sim.wins}-{sim.losses} misses September — {qualifyWins}+ wins books a finals berth.
             </p>
           )
         )}

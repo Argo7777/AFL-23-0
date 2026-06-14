@@ -1,5 +1,5 @@
-import { loadMeta, loadStrengths, loadTopRatings, poolStrengths } from "./data";
-import { finalsGameProb } from "./finals";
+import { getComp, loadMeta, loadStrengths, loadTopRatings, poolStrengths } from "./data";
+import { finalsGameProb, finalsQualifyWins } from "./finals";
 import { randomSeed } from "./rng";
 import { buildOpponents, simulateSeason } from "./sim";
 
@@ -18,8 +18,9 @@ export async function quickSeason(rating: number): Promise<QuickSeasonResult> {
   const { values } = poolStrengths(strengths, meta.decades);
   const seed = randomSeed();
   const opponents = buildOpponents(await loadTopRatings(), meta.decades, 5, seed, 200);
-  const sim = simulateSeason(rating, values, seed, opponents, [], 2000);
-  const madeFinals = sim.wins >= 13;
+  const seasonGames = getComp() === "aflw" ? 12 : 23;
+  const sim = simulateSeason(rating, values, seed, opponents, [], 2000, { seasonGames });
+  const madeFinals = sim.wins >= finalsQualifyWins(seasonGames);
   let finalsWon = 0;
   if (madeFinals) {
     const p = finalsGameProb(rating);

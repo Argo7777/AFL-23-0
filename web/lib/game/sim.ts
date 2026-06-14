@@ -72,14 +72,39 @@ export interface SimResult {
 
 /**
  * Any given Sunday: no side, however stacked, escapes the irreducible chance
- * of an upset — injuries, weather, freak days. The cap bounds a perfect
- * season at cap^23 for even a flawless team.
+ * of an upset. The per-game cap is what controls how rare a perfect run is —
+ * calibrated PER SEASON LENGTH so a perfect-rated team (≈100) goes undefeated
+ * ~5% of the time, and the odds collapse toward zero as the rating drops:
+ *   AFL  (23 games): cap ≈ 0.905  ->  ~5% chance of 23-0
+ *   AFLW (12 games): cap ≈ 0.83   ->  ~5% chance of 12-0
+ * Tuned empirically against the real strength distributions (see
+ * scripts/calibrate.ts). 0.05^(1/N) is the floor; the cap sits a touch above
+ * it because elite opponents drag the mean win-prob below the cap.
  */
-const UPSET_CAP = 0.855;
+const UPSET_CAP = 0.92;
+export function upsetCapFor(seasonGames: number): number {
+  // a loose safety ceiling on a single game; the rating-anchored base model
+  // (seasonWinBase) does the real difficulty calibration.
+  return seasonGames <= 14 ? 0.9 : 0.95;
+}
 
 /** log5 head-to-head win probability in win-share units, upset-capped */
-function winProb(a: number, b: number): number {
-  return Math.min(UPSET_CAP, (a * (1 - b)) / (a * (1 - b) + b * (1 - a)));
+function winProb(a: number, b: number, cap: number = UPSET_CAP): number {
+  return Math.min(cap, (a * (1 - b)) / (a * (1 - b) + b * (1 - a)));
+}
+
+/**
+ * Target per-game win probability, anchored to the team rating and the season
+ * length. Calibrated so a perfect-rated side (≈100) runs the table ~5% of the
+ * time — 0.05^(1/N) per game — and the chance collapses toward zero as the
+ * rating falls (edge → 0 below ~40). This is comp-agnostic: plug N=23 for AFL,
+ * N=12 for AFLW. Opponents add per-game texture around this mean (mean-
+ * preserving), so the calibration holds whatever the opponent pool looks like.
+ */
+export function seasonWinBase(teamRating: number, seasonGames: number): number {
+  const pmax = Math.pow(0.05, 1 / seasonGames);
+  const edge = Math.pow(Math.min(1, Math.max(0, (teamRating - 40) / 60)), 0.78);
+  return pmax * edge;
 }
 
 /** map a team rating onto the real strength distribution (sorted ascending) */
@@ -181,6 +206,13 @@ export function simulateGauntlet(
  * Calibration anchors: ~80 -> mid-table, ~88 -> top-four contender,
  * ~91 -> 20+ wins, ~95+ -> chasing 23-0 and the flag.
  */
+export interface SimOptions {
+  /** home-and-away games: 23 for AFL, 12 for AFLW */
+  seasonGames?: number;
+  /** per-game upset cap; defaults to the calibrated value for seasonGames */
+  upsetCap?: number;
+}
+
 export function simulateSeason(
   teamRating: number,
   strengths: number[], // sorted ascending, pooled real club-season strengths
@@ -188,33 +220,41 @@ export function simulateSeason(
   opponents: OppTeam[] | null = null, // synthetic all-star opposition
   legacyLabels: string[] = [], // real club-season labels (spoon mode)
   runs = 10_000,
+  opts: SimOptions = {},
 ): SimResult {
+  const N = opts.seasonGames ?? 23;
+  const cap = opts.upsetCap ?? upsetCapFor(N);
   const n = strengths.length;
   const userStrength = ratingToStrength(teamRating, strengths);
   const realPercentile = (strengths.filter((s) => s < userStrength).length / n) * 100;
 
-  // precompute each opponent's win probability against us
+  // rating-anchored win probability (controls the 5%-at-100 calibration), with
+  // mean-preserving per-game texture so facing the era's best is visibly harder
+  const base = seasonWinBase(teamRating, N);
+  const PERTURB = 0.3;
+  const clampP = (p: number) => Math.max(0.03, Math.min(cap, p));
   let oppProbs: number[];
   let oppLabelOf: (i: number) => string;
   let drawIdx: (rand: () => number) => number;
   if (opponents && opponents.length) {
-    oppProbs = opponents.map((o) => winProb(userStrength, ratingToStrength(o.rating, strengths)));
+    const meanOpp = opponents.reduce((a, o) => a + o.rating, 0) / opponents.length;
+    oppProbs = opponents.map((o) => clampP(base + (PERTURB * (meanOpp - o.rating)) / 100));
     oppLabelOf = (i) => opponents[i].label;
     drawIdx = (rand) => Math.floor(rand() * opponents.length);
   } else {
     // legacy schedule (wooden spoon): real club-seasons, skipping the
-    // bottom quartile and leaning toward quality
+    // bottom quartile and leaning toward quality. Top clubs are harder.
     const idxFor = (rand: () => number) => Math.floor((0.25 + 0.75 * rand() ** 0.7) * (n - 1));
-    oppProbs = strengths.map((s) => winProb(userStrength, s));
+    oppProbs = strengths.map((_, i) => clampP(base + PERTURB * (0.5 - i / Math.max(1, n - 1))));
     oppLabelOf = (i) => legacyLabels[i] ?? "a real club of the era";
     drawIdx = idxFor;
   }
 
   const rand = mulberry32(seed);
-  const winCounts = new Array(24).fill(0);
+  const winCounts = new Array(N + 1).fill(0);
   for (let r = 0; r < runs; r++) {
     let wins = 0;
-    for (let g = 0; g < 23; g++) {
+    for (let g = 0; g < N; g++) {
       if (rand() < oppProbs[drawIdx(rand)]) wins++;
     }
     winCounts[wins]++;
@@ -231,7 +271,7 @@ export function simulateSeason(
   for (let attempt = 0; attempt < 4000; attempt++) {
     const games: StoryGame[] = [];
     let wins = 0;
-    for (let g = 0; g < 23; g++) {
+    for (let g = 0; g < N; g++) {
       const i = drawIdx(storyRand);
       const win = storyRand() < oppProbs[i];
       if (win) wins++;
@@ -250,8 +290,8 @@ export function simulateSeason(
 
   return {
     wins: modalWins,
-    losses: 23 - modalWins,
-    perfectPct: (winCounts[23] / runs) * 100,
+    losses: N - modalWins,
+    perfectPct: (winCounts[N] / runs) * 100,
     userStrength,
     realPercentile,
     distribution: winCounts.map((c) => (c / runs) * 100),
