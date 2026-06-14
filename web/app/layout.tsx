@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import SisterSites from "@/components/SisterSites";
 import Footer from "@/components/Footer";
+import NavBar from "@/components/NavBar";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -71,6 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en-AU">
       <body className="antialiased">
         <SisterSites active="afl" />
+        <NavBar />
         {children}
         <Footer />
         <script

@@ -331,6 +331,17 @@ function PlayInner() {
     else rollCombo();
   }
 
+  /** card tapped: if the player only plays one position and that slot is open,
+   *  place him there directly — no need to ask. Otherwise open the chooser. */
+  function choosePlayer(player: PlayerEntry) {
+    const realPos = player.elig.filter((s) => s !== "UTL");
+    if (realPos.length === 1 && slotsLeft[realPos[0]] > 0) {
+      placePick(player, realPos[0]);
+    } else {
+      setPendingPlayer(player);
+    }
+  }
+
   /** take back the last pick and return to its pool — once per pick */
   function undoLastPick() {
     if (!undoSnap) return;
@@ -737,7 +748,7 @@ function PlayInner() {
                     showSalary={isCap}
                     disabled={isCap && !canAfford(p)}
                     ratingPos={posFilter}
-                    onPick={() => (inSwap ? confirmLifelineSwap(p) : setPendingPlayer(p))}
+                    onPick={() => (inSwap ? confirmLifelineSwap(p) : choosePlayer(p))}
                     onInfo={() => setSheetPlayer(p)}
                   />
                 ))}
