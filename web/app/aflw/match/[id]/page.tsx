@@ -5,6 +5,7 @@ import { clubColors } from "@/lib/game/clubColors";
 import { clubSlug } from "@/lib/clubdb";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
+import { jsonLd as ldScript } from "@/lib/jsonld";
 import { allMatchIds, matchBox, type BoxPlayer, type BoxScore } from "@/lib/aflwmatchdb";
 import { aflwSlugMap } from "@/lib/aflwplayerdb";
 
@@ -90,7 +91,7 @@ export default async function AflwMatchPage({ params }: { params: Promise<{ id: 
   const slugs = aflwSlugMap();
   const w1 = m.s1 > m.s2, w2 = m.s2 > m.s1;
 
-  const jsonLd = {
+  const ld = {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
     name: `${m.t1} v ${m.t2}`,
@@ -105,7 +106,7 @@ export default async function AflwMatchPage({ params }: { params: Promise<{ id: 
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldScript(ld) }} />
       <span className="flex items-center gap-2">
         <Link href="/aflw" className="font-display text-2xl font-black text-grass">23–0</Link>
         <Link href={`/aflw/season/${m.year}`} className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-[#ff5e44]/50">← {m.label} SEASON</Link>

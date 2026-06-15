@@ -6,6 +6,7 @@ import { clubRecord } from "@/lib/seasondb";
 import { clubColors } from "@/lib/game/clubColors";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
+import { jsonLd as ldScript } from "@/lib/jsonld";
 
 export const dynamic = "force-static";
 export const dynamicParams = false;
@@ -32,7 +33,7 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
 
   const [c1, c2] = clubColors(c.name);
   const POS: Record<string, string> = { DEF: "defenders", MID: "midfielders", RUC: "rucks", FWD: "forwards" };
-  const jsonLd = [
+  const ld = [
     {
       "@context": "https://schema.org",
       "@type": "SportsTeam",
@@ -55,7 +56,7 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldScript(ld) }} />
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-4 shrink-0 flex-col overflow-hidden rounded-sm">
           <span className="flex-1" style={{ background: c1 }} />

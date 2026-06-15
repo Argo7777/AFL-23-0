@@ -131,17 +131,18 @@ export default function ResultView({
   const targetWins = targetRecord ? Number(targetRecord.split("-")[0]) : null;
   const beatTarget = targetWins != null ? sim.wins - targetWins : null;
 
+  const league = comp === "aflw" ? "AFLW" : "AFL";
   const shareText = daily
-    ? `AFL 23-0 Daily #${dailyNumber()}: ${sim.wins}-${sim.losses}${
+    ? `${league} 23-0 Daily #${dailyNumber()}: ${sim.wins}-${sim.losses}${
         flagWon ? " 🏆" : ""
       }${perfect ? " — PERFECTION" : ""}. Play today's:`
     : spoon
       ? `I went ${sim.wins}-${sim.losses} chasing the wooden spoon 🥄${
           perfect ? " — PERFECT SPOON!" : ""
-        } on AFL 23-0. Build worse:`
+        } on ${league} 23-0. Build worse:`
       : `I went ${sim.wins}-${sim.losses}${
           flagWon ? " and won the flag 🏆" : ""
-        } with my all-era AFL team. Build yours:`;
+        } with my all-era ${league} team. Build yours:`;
 
   async function cardFile(): Promise<File> {
     const blob = await buildShareCard(
@@ -318,11 +319,11 @@ export default function ResultView({
           )}
           {spoon ? (
             <span>
-              Goes 0-23 in <b className="text-slate-100">{sim.distribution[0].toFixed(1)}%</b> of seasons
+              Goes 0-{seasonGames} in <b className="text-slate-100">{sim.distribution[0].toFixed(1)}%</b> of seasons
             </span>
           ) : (
             <span>
-              Goes 23-0 in <b className="text-slate-100">{sim.perfectPct.toFixed(1)}%</b> of seasons
+              Goes {seasonGames}-0 in <b className="text-slate-100">{sim.perfectPct.toFixed(1)}%</b> of seasons
             </span>
           )}
         </div>
@@ -370,7 +371,7 @@ export default function ResultView({
               {sim.distribution.map((pct, w) => (
                 <div key={w} className="group relative flex h-full flex-1 items-end">
                   <div
-                    className={`w-full rounded-t-sm ${w === 23 ? "bg-grass" : w === sim.wins ? "bg-gold" : "bg-line"}`}
+                    className={`w-full rounded-t-sm ${w === seasonGames ? "bg-grass" : w === sim.wins ? "bg-gold" : "bg-line"}`}
                     style={{ height: `${Math.max(2, (pct / maxDist) * 100)}%` }}
                   />
                   <div className="pointer-events-none absolute -top-7 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-pitch px-1.5 py-0.5 text-[10px] text-slate-300 group-hover:block">
@@ -381,7 +382,7 @@ export default function ResultView({
             </div>
             <div className="mt-1 flex justify-between text-[10px] text-slate-600">
               <span>0 wins</span>
-              <span>23 wins</span>
+              <span>{seasonGames} wins</span>
             </div>
           </div>
 

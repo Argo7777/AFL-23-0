@@ -50,11 +50,13 @@ function clubKey(c: "afl" | "aflw"): string {
   return c === "afl" ? "club230" : `club230:${c}`;
 }
 
-async function addTo(env: Env, key: string, entry: Entry, max = 100): Promise<void> {
+async function addTo(env: Env, key: string, entry: Entry, max = 100, ttl?: number): Promise<void> {
   const cur = JSON.parse((await env.BOARD.get(key)) ?? "[]") as Entry[];
   cur.push(entry);
   cur.sort(byBest);
-  await env.BOARD.put(key, JSON.stringify(cur.slice(0, max)));
+  // daily keys carry a TTL so they don't accumulate forever; the all-time
+  // club board is permanent (no ttl).
+  await env.BOARD.put(key, JSON.stringify(cur.slice(0, max)), ttl ? { expirationTtl: ttl } : undefined);
 }
 
 export default {
@@ -88,14 +90,15 @@ export default {
       const daily = String(body.daily ?? "");
       const c = comp(body.comp);
       if (!name || !Number.isFinite(wins) || wins < 0 || wins > 23 || losses < 0 || losses > 23 ||
-          !Number.isFinite(rating) || rating < 0 || rating > 100) {
+          wins + losses > 23 || !Number.isFinite(rating) || rating < 0 || rating > 100) {
         return new Response(`{"error":"invalid"}`, { status: 400, headers });
       }
       const fin = ["QF", "SF", "PF", "GF", "P"].includes(String(body.fin)) ? String(body.fin) : "";
       const entry: Entry = {
         n: name, w: wins, l: losses, r: rating, f: Boolean(body.flag), m: mode, t: Date.now(), fin,
       };
-      if (/^\d{4}-\d{2}-\d{2}$/.test(daily)) await addTo(env, dailyKey(c, daily), entry);
+      // daily boards expire after ~45 days so KV doesn't grow forever
+      if (/^\d{4}-\d{2}-\d{2}$/.test(daily)) await addTo(env, dailyKey(c, daily), entry, 100, 3_888_000);
       // the perfect-season Club: 23-0 (AFL) or 12-0 (AFLW), newest first
       const perfectWins = c === "aflw" ? 12 : 23;
       if (wins === perfectWins && losses === 0 && mode !== "spoon" && mode !== "gauntlet") {

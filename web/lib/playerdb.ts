@@ -53,9 +53,11 @@ export function notableCareers(): CareerPlayer[] {
   return [...loadCareers().values()].filter((c) => c.best >= 75);
 }
 
+let bySlugCache: Map<string, CareerPlayer> | null = null;
 export function careerBySlug(slug: string): CareerPlayer | null {
-  for (const c of loadCareers().values()) {
-    if (c.slug === slug) return c;
+  if (!bySlugCache) {
+    bySlugCache = new Map();
+    for (const c of loadCareers().values()) bySlugCache.set(c.slug, c);
   }
-  return null;
+  return bySlugCache.get(slug) ?? null;
 }

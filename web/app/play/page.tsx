@@ -312,7 +312,7 @@ function PlayInner() {
         flag: false, // upgraded by flagLastGame() if they win the finals
         perfect: result.wins === (comp === "aflw" ? 12 : 23),
         rating: Math.round(rating * 10) / 10, eras: finalEras,
-        ...(isDaily ? { daily: todayMelbourne() } : {}),
+        ...(isDaily ? { daily: comp === "aflw" ? `${todayMelbourne()}-aflw` : todayMelbourne() } : {}),
       });
       setNewBadges(earned);
     }

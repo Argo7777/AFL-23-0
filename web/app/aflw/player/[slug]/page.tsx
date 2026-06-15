@@ -5,7 +5,18 @@ import { clubColors } from "@/lib/game/clubColors";
 import { clubSlug } from "@/lib/clubdb";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
+import { jsonLd as ldScript } from "@/lib/jsonld";
 import { aflwCareerBySlug, notableAflwCareers } from "@/lib/aflwplayerdb";
+import { aflwSeasonKeys } from "@/lib/aflwdb";
+
+// a player season is keyed by year, but season pages use season_keys (2022 →
+// 2022-s6/2022-s7). Resolve to a real page so the link never 404s.
+function seasonHref(year: number, keys: string[]): string {
+  const y = String(year);
+  if (keys.includes(y)) return `/aflw/season/${y}`;
+  const split = keys.filter((k) => k.startsWith(`${year}-`)).sort().pop();
+  return `/aflw/season/${split ?? y}`;
+}
 
 export const dynamic = "force-static";
 export const dynamicParams = false;
@@ -36,8 +47,9 @@ export default async function AflwPlayerPage({ params }: { params: Promise<{ slu
   const [c1, c2] = clubColors(c.clubs[0] ?? "");
   const yrs = c.seasons.length === 1 ? `${c.seasons[0].year}` : `${c.seasons[0].year}–${c.seasons[c.seasons.length - 1].year}`;
   const hasGoals = c.primaryPos === "FWD";
+  const seasonKeys = aflwSeasonKeys();
 
-  const jsonLd = [
+  const ld = [
     {
       "@context": "https://schema.org",
       "@type": "Person",
@@ -59,7 +71,7 @@ export default async function AflwPlayerPage({ params }: { params: Promise<{ slu
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ldScript(ld) }} />
       <span className="flex items-center gap-2">
         <Link href="/aflw" className="font-display text-2xl font-black text-grass">23–0</Link>
         <Link href="/aflw/greats" className="rounded-lg border border-line px-2.5 py-1 font-display text-[11px] font-black text-slate-300 hover:border-[#ff5e44]/50">← AFLW PLAYERS</Link>
@@ -101,7 +113,7 @@ export default async function AflwPlayerPage({ params }: { params: Promise<{ slu
         <div className="mt-1 grid gap-0.5">
           {c.seasons.slice().reverse().map((s) => (
             <div key={s.year} className="grid grid-cols-5 gap-1 rounded bg-pitch px-2 py-1 text-center text-xs text-slate-300">
-              <Link href={`/aflw/season/${s.year}`} className="text-left font-display font-black text-slate-100 hover:text-ice">{s.year}</Link>
+              <Link href={seasonHref(s.year, seasonKeys)} className="text-left font-display font-black text-slate-100 hover:text-ice">{s.year}</Link>
               <span>{s.games}</span>
               <span>{hasGoals ? (s.st.gl ?? "—") : (s.st.di ?? "—")}</span>
               <span>{s.nat}</span>
