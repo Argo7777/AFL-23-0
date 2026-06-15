@@ -19,6 +19,7 @@ export interface Match {
   t1: string; s1: number;
   t2: string; s2: number;
   venue: string;
+  id?: string; // AFLW matches carry an id (links to the match box-score page)
 }
 
 // Franchise identity across eras (mirror of pipeline/src/lib/clubs.ts) so a
@@ -106,6 +107,47 @@ export function seasonFinals(year: number): Match[] {
   return seasonMatches(year)
     .filter((m) => isFinal(m.round))
     .sort((a, b) => (order[a.round] ?? 0) - (order[b.round] ?? 0));
+}
+
+export interface ClubRecord {
+  played: number; w: number; l: number; d: number;
+  pf: number; pa: number; pct: number; winPct: number;
+  firstYear: number; lastYear: number;
+  biggestWin: { margin: number; year: number; opp: string } | null;
+}
+
+/** All-time match record for a club (canonical name), across every season —
+ *  home-and-away + finals. Era names (Footscray, South Melbourne) fold in. */
+export function clubRecord(canonical: string): ClubRecord {
+  let played = 0, w = 0, l = 0, d = 0, pf = 0, pa = 0;
+  let firstYear = Infinity, lastYear = -Infinity;
+  let biggest: ClubRecord["biggestWin"] = null;
+  const all = matches();
+  for (const yStr of Object.keys(all)) {
+    const year = Number(yStr);
+    for (const t of all[yStr]) {
+      const home = canonicalClub(t[2]) === canonical;
+      const away = canonicalClub(t[4]) === canonical;
+      if (!home && !away) continue;
+      const us = home ? t[3] : t[5];
+      const them = home ? t[5] : t[3];
+      const opp = canonicalClub(home ? t[4] : t[2]);
+      played++; pf += us; pa += them;
+      if (year < firstYear) firstYear = year;
+      if (year > lastYear) lastYear = year;
+      if (us > them) { w++; if (!biggest || us - them > biggest.margin) biggest = { margin: us - them, year, opp }; }
+      else if (us < them) l++;
+      else d++;
+    }
+  }
+  return {
+    played, w, l, d, pf, pa,
+    pct: pa > 0 ? Math.round((pf / pa) * 1000) / 10 : 0,
+    winPct: played > 0 ? Math.round(((w + d * 0.5) / played) * 1000) / 10 : 0,
+    firstYear: firstYear === Infinity ? 0 : firstYear,
+    lastYear: lastYear === -Infinity ? 0 : lastYear,
+    biggestWin: biggest,
+  };
 }
 
 /** Premier + runner-up of a season (from the Grand Final), if played. */

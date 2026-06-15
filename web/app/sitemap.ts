@@ -3,6 +3,7 @@ import { allClubNames, clubSlug } from "@/lib/clubdb";
 import { allSeasonYears, currentYear } from "@/lib/seasondb";
 import { aflwSeasonKeys } from "@/lib/aflwdb";
 import { notableAflwCareers } from "@/lib/aflwplayerdb";
+import { allMatchIds } from "@/lib/aflwmatchdb";
 
 export const dynamic = "force-static";
 
@@ -58,5 +59,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     changeFrequency: "monthly",
     priority: 0.5,
   }));
-  return [...core, ...clubs, ...seasons, ...aflwSeasons, ...aflwPlayers];
+  const aflwMatches: MetadataRoute.Sitemap = allMatchIds().map((id) => ({
+    url: `${base}/aflw/match/${id}/`,
+    changeFrequency: "yearly",
+    priority: 0.4,
+  }));
+  return [...core, ...clubs, ...seasons, ...aflwSeasons, ...aflwPlayers, ...aflwMatches];
 }

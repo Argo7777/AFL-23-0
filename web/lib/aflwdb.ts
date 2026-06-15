@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { clubSlug } from "@/lib/clubdb";
-import { isHomeAndAway, isFinal, type LadderRow, type Match, type MatchTuple } from "@/lib/seasondb";
+import { isHomeAndAway, isFinal, type LadderRow, type Match } from "@/lib/seasondb";
 
 /** Build-time AFLW data: ladders + fixtures per season, from the AFL API feed.
  *  AFLW team names are already canonicalised to AFL club identities upstream,
@@ -31,9 +31,11 @@ let dataCache: AflwData | null = null;
 function data(): AflwData {
   return (dataCache ??= read<AflwData>("aflw.json"));
 }
-let matchesCache: Record<string, MatchTuple[]> | null = null;
-function matches(): Record<string, MatchTuple[]> {
-  return (matchesCache ??= read<Record<string, MatchTuple[]>>("aflw-matches.json"));
+// AFLW match tuples carry the match id as an 8th element (for match-page links)
+type AflwTuple = [string, string, string, number, string, number, string, string];
+let matchesCache: Record<string, AflwTuple[]> | null = null;
+function matches(): Record<string, AflwTuple[]> {
+  return (matchesCache ??= read<Record<string, AflwTuple[]>>("aflw-matches.json"));
 }
 
 export function teamSlug(team: string): string {
@@ -64,8 +66,8 @@ export function aflwSeasonKeys(): string[] {
   return data().seasons.map((s) => s.key);
 }
 
-function toMatch(t: MatchTuple): Match {
-  return { round: t[0], date: t[1], t1: t[2], s1: t[3], t2: t[4], s2: t[5], venue: t[6] };
+function toMatch(t: AflwTuple): Match {
+  return { round: t[0], date: t[1], t1: t[2], s1: t[3], t2: t[4], s2: t[5], venue: t[6], id: t[7] };
 }
 export function aflwMatches(key: string): Match[] {
   return (matches()[key] ?? []).map(toMatch);

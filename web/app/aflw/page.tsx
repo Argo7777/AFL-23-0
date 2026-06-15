@@ -99,7 +99,7 @@ export default function AflwHub() {
           </div>
           <div>
             <h3 className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#ff8d79]">Round {cur.round} results</h3>
-            <ResultsList matches={latest} slugs={slugs} />
+            <ResultsList matches={latest} slugs={slugs} matchBase="/aflw/match" />
           </div>
         </div>
       </section>

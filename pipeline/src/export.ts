@@ -227,11 +227,11 @@ export function exportData() {
   // disambiguate the 2022 doubleheader). AFL stays the primary surface.
   const aflwRows = db
     .prepare(
-      `SELECT season_key, label, year, round, team1, score1, team2, score2, venue, date
+      `SELECT match_id, season_key, label, year, round, team1, score1, team2, score2, venue, date
          FROM aflw_matches ORDER BY year, season_key, rowid`,
     )
     .all() as {
-    season_key: string; label: string; year: number; round: string;
+    match_id: string; season_key: string; label: string; year: number; round: string;
     team1: string; score1: number; team2: string; score2: number; venue: string | null; date: string;
   }[];
 
@@ -245,10 +245,10 @@ export function exportData() {
       yearOf.set(m.season_key, m.year);
     }
 
-    const aflwMatches: Record<string, [string, string, string, number, string, number, string][]> = {};
+    const aflwMatches: Record<string, [string, string, string, number, string, number, string, string][]> = {};
     const aflwLadders: Record<string, LadderRow[]> = {};
     for (const [key, rows] of aflwByKey) {
-      aflwMatches[key] = rows.map((m) => [m.round, m.date, m.team1, m.score1, m.team2, m.score2, m.venue ?? ""]);
+      aflwMatches[key] = rows.map((m) => [m.round, m.date, m.team1, m.score1, m.team2, m.score2, m.venue ?? "", m.match_id]);
       const tally = new Map<string, LadderRow>();
       const get = (t: string) =>
         tally.get(t) ?? tally.set(t, { team: t, p: 0, w: 0, l: 0, d: 0, pf: 0, pa: 0, pts: 0, pct: 0 }).get(t)!;
@@ -305,6 +305,40 @@ export function exportData() {
       .map((m) => ({ t1: m.team1, s1: m.score1, t2: m.team2, s2: m.score2, v: m.venue ?? "", d: m.date }));
 
     writeFileSync(join(OUT_DIR, "aflw-matches.json"), JSON.stringify(aflwMatches));
+
+    // ---- AFLW match box scores (per-match player stats) for the match pages ----
+    const pgRows = db
+      .prepare(
+        `SELECT match_id, team, name, position, gl, kk, hb, di, mk, tk, cp, i5, mi5, ho, cl, r5, ic, ga
+           FROM aflw_player_games`,
+      )
+      .all() as {
+      match_id: string; team: string; name: string; position: string | null;
+      gl: number; kk: number; hb: number; di: number; mk: number; tk: number; cp: number;
+      i5: number; mi5: number; ho: number; cl: number; r5: number; ic: number; ga: number;
+    }[];
+    const pgByMatch = new Map<string, typeof pgRows>();
+    for (const r of pgRows) {
+      (pgByMatch.get(r.match_id) ?? pgByMatch.set(r.match_id, []).get(r.match_id)!).push(r);
+    }
+    const pick = (p: (typeof pgRows)[0]) => ({
+      n: p.name, pos: p.position ?? "",
+      di: p.di, kk: p.kk, hb: p.hb, mk: p.mk, tk: p.tk, gl: p.gl, ho: p.ho,
+      cp: p.cp, i5: p.i5, cl: p.cl, r5: p.r5, ic: p.ic, ga: p.ga,
+    });
+    const boxscores: Record<string, unknown> = {};
+    for (const m of aflwRows) {
+      const players = pgByMatch.get(m.match_id);
+      if (!players || players.length === 0) continue;
+      boxscores[m.match_id] = {
+        round: m.round, date: m.date, venue: m.venue ?? "", label: m.label, year: m.year,
+        t1: m.team1, s1: m.score1, t2: m.team2, s2: m.score2,
+        home: players.filter((p) => p.team === m.team1).map(pick),
+        away: players.filter((p) => p.team === m.team2).map(pick),
+      };
+    }
+    writeFileSync(join(OUT_DIR, "aflw-boxscores.json"), JSON.stringify(boxscores));
+
     writeFileSync(
       join(OUT_DIR, "aflw.json"),
       JSON.stringify({

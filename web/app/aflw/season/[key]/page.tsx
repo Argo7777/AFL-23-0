@@ -80,7 +80,7 @@ export default async function AflwSeasonPage({ params }: { params: Promise<{ key
       <AdSlot slot={AD_SLOTS.content} className="mt-6" />
 
       <h2 className="font-display mt-8 text-xl font-black">Results</h2>
-      <div className="mt-3"><ResultsList matches={matches} slugs={slugs} /></div>
+      <div className="mt-3"><ResultsList matches={matches} slugs={slugs} matchBase="/aflw/match" /></div>
 
       <div className="mt-8 flex flex-wrap gap-2 text-sm">
         <Link href="/aflw/seasons" className="rounded-xl border border-line bg-pitch-light px-4 py-2 font-display font-black text-slate-200 hover:border-[#ff5e44]/50">Every AFLW season →</Link>

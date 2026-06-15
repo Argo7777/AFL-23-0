@@ -41,7 +41,7 @@ export default function AflwResultsPage() {
       </p>
 
       <div className="mt-5"><AflwSeasonPicker seasons={seasons} current={cur.key} /></div>
-      <div className="mt-5"><ResultsList matches={matches} slugs={slugs} /></div>
+      <div className="mt-5"><ResultsList matches={matches} slugs={slugs} matchBase="/aflw/match" /></div>
 
       <AdSlot slot={AD_SLOTS.content} className="mt-6" />
 

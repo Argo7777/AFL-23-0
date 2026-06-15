@@ -97,3 +97,13 @@ export function notableAflwCareers(): AflwCareer[] {
 export function aflwSlugByName(name: string): string | undefined {
   return build().find((c) => c.name === name)?.slug;
 }
+
+let slugMapCache: Record<string, string> | null = null;
+/** name → player-page slug, for any player with a page (≥3 games). */
+export function aflwSlugMap(): Record<string, string> {
+  if (!slugMapCache) {
+    slugMapCache = {};
+    for (const c of notableAflwCareers()) slugMapCache[c.name] = c.slug;
+  }
+  return slugMapCache;
+}

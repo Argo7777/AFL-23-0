@@ -9,6 +9,7 @@ export interface ResultMatch {
   t1: string; s1: number;
   t2: string; s2: number;
   venue: string;
+  id?: string; // when set with matchBase, the score links to a match page
 }
 
 const FINAL_LABEL: Record<string, string> = {
@@ -19,16 +20,24 @@ function roundLabel(round: string): string {
   return FINAL_LABEL[round] ?? `Round ${round.slice(1)}`;
 }
 
-function Row({ m, slugs }: { m: ResultMatch; slugs: Record<string, string> }) {
+function Row({ m, slugs, matchBase }: { m: ResultMatch; slugs: Record<string, string>; matchBase?: string }) {
   const w1 = m.s1 > m.s2, w2 = m.s2 > m.s1;
+  const scoreCls = "font-display font-black tabular-nums";
+  const score = (
+    <span className="flex shrink-0 items-center gap-2">
+      <span className={`w-8 text-right ${scoreCls} ${w1 ? "text-grass" : "text-slate-500"}`}>{m.s1}</span>
+      <span className="text-[10px] text-slate-600">v</span>
+      <span className={`w-8 ${scoreCls} ${w2 ? "text-grass" : "text-slate-500"}`}>{m.s2}</span>
+    </span>
+  );
   return (
     <div className="flex items-center gap-2 rounded-lg bg-pitch px-3 py-2 text-sm">
       <Link href={`/club/${slugs[m.t1] ?? ""}`} className={`min-w-0 flex-1 truncate text-right font-display font-black hover:text-ice ${w1 ? "text-slate-100" : "text-slate-500"}`}>
         {m.t1}
       </Link>
-      <span className={`w-8 shrink-0 text-right font-display font-black tabular-nums ${w1 ? "text-grass" : "text-slate-500"}`}>{m.s1}</span>
-      <span className="shrink-0 text-[10px] text-slate-600">v</span>
-      <span className={`w-8 shrink-0 font-display font-black tabular-nums ${w2 ? "text-grass" : "text-slate-500"}`}>{m.s2}</span>
+      {matchBase && m.id ? (
+        <Link href={`${matchBase}/${m.id}`} title="Box score" className="rounded px-1 hover:bg-pitch-light">{score}</Link>
+      ) : score}
       <Link href={`/club/${slugs[m.t2] ?? ""}`} className={`min-w-0 flex-1 truncate font-display font-black hover:text-ice ${w2 ? "text-slate-100" : "text-slate-500"}`}>
         {m.t2}
       </Link>
@@ -40,9 +49,11 @@ function Row({ m, slugs }: { m: ResultMatch; slugs: Record<string, string> }) {
 export default function ResultsList({
   matches,
   slugs,
+  matchBase,
 }: {
   matches: ResultMatch[];
   slugs: Record<string, string>;
+  matchBase?: string;
 }) {
   const roundOptions = useMemo(() => {
     const seen: string[] = [];
@@ -102,7 +113,7 @@ export default function ResultsList({
               {roundLabel(g.round)}
             </h3>
             <div className="grid gap-1.5">
-              {g.matches.map((m, i) => <Row key={i} m={m} slugs={slugs} />)}
+              {g.matches.map((m, i) => <Row key={i} m={m} slugs={slugs} matchBase={matchBase} />)}
             </div>
           </div>
         ))}

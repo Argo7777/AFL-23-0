@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { allClubNames, clubData, clubSlug } from "@/lib/clubdb";
+import { clubRecord } from "@/lib/seasondb";
 import { clubColors } from "@/lib/game/clubColors";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
@@ -50,6 +51,8 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
     },
   ];
 
+  const rec = clubRecord(c.name);
+
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -70,6 +73,25 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
         <span>Grand Final losses <b className="font-display text-xl text-slate-100">{c.runnerUps.length}</b></span>
         <span>Players rated <b className="font-display text-xl text-grass">{c.playerCount}</b></span>
       </div>
+
+      {rec.played > 0 && (
+        <div className="mt-4 rounded-2xl border border-line bg-pitch-light p-4">
+          <p className="text-[11px] uppercase tracking-widest text-slate-500">
+            all-time VFL/AFL record · {rec.firstYear}–{rec.lastYear}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-x-7 gap-y-2 text-sm text-slate-300">
+            <span>Played <b className="font-display text-lg text-slate-100">{rec.played.toLocaleString()}</b></span>
+            <span>Record <b className="font-display text-lg text-slate-100">{rec.w}-{rec.l}{rec.d ? `-${rec.d}` : ""}</b></span>
+            <span>Win rate <b className="font-display text-lg text-grass">{rec.winPct}%</b></span>
+            <span>Scoring % <b className="font-display text-lg text-slate-100">{rec.pct}</b></span>
+          </div>
+          {rec.biggestWin && (
+            <p className="mt-2 text-xs text-slate-500">
+              Biggest win: {rec.biggestWin.margin} pts v {rec.biggestWin.opp} ({rec.biggestWin.year}).
+            </p>
+          )}
+        </div>
+      )}
 
       {c.flags.length > 0 && (
         <div className="mt-4 rounded-2xl border border-gold/40 bg-pitch-light p-4">
