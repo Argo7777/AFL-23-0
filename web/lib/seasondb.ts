@@ -57,6 +57,17 @@ function matches(): Record<string, MatchTuple[]> {
   return (matchesCache ??= read<Record<string, MatchTuple[]>>("season-matches.json"));
 }
 
+// footywire box-score links: "year|round|teampair" or "year|teampair" → mid.
+// Optional — present only for seasons with scraped box scores.
+let linksCache: Record<string, number> | null | undefined;
+function aflLinks(): Record<string, number> {
+  if (linksCache === undefined) {
+    try { linksCache = read<Record<string, number>>("afl-match-links.json"); }
+    catch { linksCache = null; }
+  }
+  return linksCache ?? {};
+}
+
 /** Every season with data, newest first. */
 export function allSeasonYears(): number[] {
   return Object.keys(ladders())
@@ -84,9 +95,17 @@ function toMatch(t: MatchTuple): Match {
   return { round: t[0], date: t[1], t1: t[2], s1: t[3], t2: t[4], s2: t[5], venue: t[6] };
 }
 
-/** All matches for a season in fixture order. */
+/** All matches for a season in fixture order, with a footywire box-score id
+ *  attached where one exists (links the score to a /match page). */
 export function seasonMatches(year: number): Match[] {
-  return (matches()[year] ?? []).map(toMatch);
+  const links = aflLinks();
+  return (matches()[year] ?? []).map((t) => {
+    const m = toMatch(t);
+    const pair = [canonicalClub(m.t1), canonicalClub(m.t2)].sort().join("|");
+    const id = links[`${year}|${m.round}|${pair}`] ?? links[`${year}|${pair}`];
+    if (id != null) m.id = String(id);
+    return m;
+  });
 }
 
 /** Home-and-away rounds grouped { "R1": [...], ... } in round order. */

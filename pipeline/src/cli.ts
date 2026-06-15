@@ -7,6 +7,7 @@ import { scrapeWikidataPositions } from "./scrape/wikidata-enrich.js";
 import { exportData } from "./export.js";
 import { scrapeAfltablesBrownlow } from "./scrape/afltables-brownlow.js";
 import { scrapeAflw, scrapeAflwPlayers } from "./scrape/afl-api.js";
+import { scrapeAflMatches } from "./scrape/footywire-matches.js";
 
 const [, , command, ...args] = process.argv;
 
@@ -58,6 +59,11 @@ async function main() {
     case "scrape:aflw-players": {
       console.log("Scraping AFLW per-match player stats from the AFL API...");
       await scrapeAflwPlayers(args.includes("--force"));
+      break;
+    }
+    case "scrape:matches": {
+      console.log("Scraping AFL per-match player stats from footywire...");
+      await scrapeAflMatches({ from: argNum("--from"), to: argNum("--to"), force: args.includes("--force") });
       break;
     }
     case "refresh": {

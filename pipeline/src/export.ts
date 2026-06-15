@@ -209,6 +209,63 @@ export function exportData() {
   writeFileSync(join(OUT_DIR, "season-matches.json"), JSON.stringify(seasonMatches));
   writeFileSync(join(OUT_DIR, "seasons.json"), JSON.stringify(ladders));
 
+  // ---- AFL match box scores (footywire) — per-year shards + link map ----
+  // footywire short names → canonical; round labels → afltables codes so the
+  // box scores join cleanly to the afltables-derived results pages.
+  const FW_CANON: Record<string, string> = {
+    GWS: "Greater Western Sydney", Brisbane: "Brisbane Lions",
+    Footscray: "Western Bulldogs", Kangaroos: "North Melbourne",
+  };
+  const canonFw = (n: string) => canonicalClub(FW_CANON[n] ?? n);
+  const normFwRound = (r: string): string => {
+    const m = /^Round (\d+)$/.exec(r);
+    if (m) return `R${m[1]}`;
+    if (/Grand Final/i.test(r)) return "GF";
+    if (/Preliminary/i.test(r)) return "PF";
+    if (/Semi/i.test(r)) return "SF";
+    if (/Qualifying/i.test(r)) return "QF";
+    if (/Elimination/i.test(r)) return "EF";
+    return "F"; // "Finals Week 1" etc — keyed loosely, teamset disambiguates
+  };
+  const matchMeta = db
+    .prepare(`SELECT mid, year, round, home, away, hscore, ascore, venue, date FROM afl_match_meta`)
+    .all() as { mid: number; year: number; round: string; home: string; away: string; hscore: number; ascore: number; venue: string | null; date: string }[];
+
+  if (matchMeta.length > 0) {
+    const ps = db
+      .prepare(`SELECT mid, team, name, kk, hb, di, mk, gl, bh, tk, ho, ga, i5, cl, r5 FROM afl_match_player_stats`)
+      .all() as { mid: number; team: string; name: string; kk: number; hb: number; di: number; mk: number; gl: number; bh: number; tk: number; ho: number; ga: number; i5: number; cl: number; r5: number }[];
+    const psByMid = new Map<number, typeof ps>();
+    for (const r of ps) (psByMid.get(r.mid) ?? psByMid.set(r.mid, []).get(r.mid)!).push(r);
+
+    const pick = (p: (typeof ps)[0]) => ({ n: p.name, di: p.di, kk: p.kk, hb: p.hb, mk: p.mk, tk: p.tk, gl: p.gl, ho: p.ho, ga: p.ga, i5: p.i5, cl: p.cl, r5: p.r5 });
+    const boxByYear: Record<string, Record<string, unknown>> = {};
+    const boxIndex: Record<string, number> = {};   // mid → year
+    const linkMap: Record<string, number> = {};     // join key → mid (for results→match links)
+
+    for (const m of matchMeta) {
+      const players = psByMid.get(m.mid);
+      if (!players || players.length === 0) continue; // skip un-parsed matches
+      const t1 = canonFw(m.home), t2 = canonFw(m.away);
+      (boxByYear[m.year] ??= {})[m.mid] = {
+        round: m.round, date: m.date, venue: m.venue ?? "", year: m.year,
+        t1, s1: m.hscore, t2, s2: m.ascore,
+        home: players.filter((p) => canonFw(p.team) === t1).map(pick),
+        away: players.filter((p) => canonFw(p.team) === t2).map(pick),
+      };
+      boxIndex[m.mid] = m.year;
+      const pair = [t1, t2].sort().join("|");
+      linkMap[`${m.year}|${normFwRound(m.round)}|${pair}`] = m.mid;
+      linkMap[`${m.year}|${pair}`] = m.mid; // teamset fallback (finals, unique pairings)
+    }
+    for (const y of Object.keys(boxByYear)) {
+      writeFileSync(join(OUT_DIR, `afl-boxscores-${y}.json`), JSON.stringify(boxByYear[y]));
+    }
+    writeFileSync(join(OUT_DIR, "afl-box-index.json"), JSON.stringify(boxIndex));
+    writeFileSync(join(OUT_DIR, "afl-match-links.json"), JSON.stringify(linkMap));
+    console.log(`AFL box scores: ${Object.keys(boxIndex).length} matches across ${Object.keys(boxByYear).length} seasons`);
+  }
+
   // compact current-season snapshot for the home page (latest round + ladder)
   const latestYear = Math.max(...byYear.keys());
   const latestRows = byYear.get(latestYear)!;

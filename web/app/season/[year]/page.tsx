@@ -91,7 +91,7 @@ export default async function SeasonPage({ params }: { params: Promise<{ year: s
 
       <h2 className="font-display mt-8 text-xl font-black">Results</h2>
       <div className="mt-3">
-        <ResultsList matches={matches} slugs={slugs} />
+        <ResultsList matches={matches} slugs={slugs} matchBase="/match" />
       </div>
 
       <div className="mt-8 flex flex-wrap gap-2 text-sm">

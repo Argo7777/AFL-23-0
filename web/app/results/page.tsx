@@ -46,7 +46,7 @@ export default function ResultsPage() {
       </div>
 
       <div className="mt-5">
-        <ResultsList matches={matches} slugs={slugs} />
+        <ResultsList matches={matches} slugs={slugs} matchBase="/match" />
       </div>
 
       <AdSlot slot={AD_SLOTS.content} className="mt-6" />

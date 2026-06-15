@@ -52,6 +52,27 @@ CREATE TABLE IF NOT EXISTS aflw_matches (
   venue TEXT
 );
 
+CREATE TABLE IF NOT EXISTS afl_match_meta (
+  mid INTEGER PRIMARY KEY,          -- footywire match id
+  year INTEGER NOT NULL,
+  round TEXT NOT NULL,              -- "Round 1" / "Grand Final" (footywire label)
+  home TEXT NOT NULL, away TEXT NOT NULL,
+  hscore INTEGER, ascore INTEGER,
+  venue TEXT, date TEXT             -- "Thu 14 Mar 7:30pm"
+);
+CREATE INDEX IF NOT EXISTS idx_afl_match_meta_year ON afl_match_meta(year);
+
+CREATE TABLE IF NOT EXISTS afl_match_player_stats (
+  mid INTEGER NOT NULL,
+  team TEXT NOT NULL,               -- footywire team name
+  name TEXT NOT NULL,               -- "Patrick Cripps"
+  kk INTEGER, hb INTEGER, di INTEGER, mk INTEGER, gl INTEGER, bh INTEGER,
+  tk INTEGER, ho INTEGER, ga INTEGER, i5 INTEGER, cl INTEGER, cg INTEGER,
+  r5 INTEGER, ff INTEGER, fa INTEGER, af INTEGER, sc INTEGER,
+  PRIMARY KEY (mid, name)
+);
+CREATE INDEX IF NOT EXISTS idx_afl_mps_mid ON afl_match_player_stats(mid);
+
 CREATE TABLE IF NOT EXISTS aflw_player_games (
   match_id TEXT NOT NULL,
   season_key TEXT NOT NULL,
