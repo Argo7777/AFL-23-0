@@ -14,6 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/ladder/`, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/results/`, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/seasons/`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${base}/predict/`, changeFrequency: "daily", priority: 0.7 },
     { url: `${base}/play/`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${base}/greats/`, changeFrequency: "weekly", priority: 0.8 },
     { url: `${base}/clubs/`, changeFrequency: "weekly", priority: 0.8 },

@@ -38,6 +38,9 @@ function corsHeaders(req: Request): Record<string, string> {
 
 const byBest = (a: Entry, b: Entry) => b.w - a.w || b.r - a.r || a.t - b.t;
 
+// awards people can predict (one tally per comp+category in KV)
+const VOTE_CATS = new Set(["premiership", "spoon", "brownlow", "coleman", "rising"]);
+
 // AFL keeps its original key names (backward-compatible); AFLW is namespaced so
 // the two competitions have completely separate boards.
 function comp(v: unknown): "afl" | "aflw" {
@@ -108,6 +111,44 @@ export default {
         await env.BOARD.put(ck, JSON.stringify(cur.slice(0, 200)));
       }
       return new Response(`{"ok":true}`, { headers });
+    }
+
+    // ---- awards predictor: people vote on who'll win the season's awards ----
+    if (req.method === "POST" && url.pathname === "/vote") {
+      const ip = req.headers.get("CF-Connecting-IP") ?? "unknown";
+      const vrl = `vrl:${ip}`;
+      const vc = Number((await env.BOARD.get(vrl)) ?? 0);
+      if (vc >= 40) return new Response(`{"error":"slow down"}`, { status: 429, headers });
+      await env.BOARD.put(vrl, String(vc + 1), { expirationTtl: 60 });
+
+      let body: Record<string, unknown>;
+      try { body = await req.json(); } catch { return new Response(`{"error":"bad json"}`, { status: 400, headers }); }
+      const c = comp(body.comp);
+      const category = String(body.category ?? "");
+      if (!VOTE_CATS.has(category)) return new Response(`{"error":"bad category"}`, { status: 400, headers });
+      const clean = (s: unknown) => String(s ?? "").replace(/[^A-Za-z0-9 .'\-]/g, "").trim().slice(0, 40);
+      const choice = clean(body.choice);
+      const prev = clean(body.prev);
+      if (!choice) return new Response(`{"error":"no choice"}`, { status: 400, headers });
+
+      const key = `v:${c}:${category}`;
+      const tally = JSON.parse((await env.BOARD.get(key)) ?? "{}") as Record<string, number>;
+      tally[choice] = (tally[choice] ?? 0) + 1;
+      if (prev && prev !== choice && (tally[prev] ?? 0) > 0) tally[prev]--;
+      // ~400-day TTL so tallies reset between seasons
+      await env.BOARD.put(key, JSON.stringify(tally), { expirationTtl: 34_560_000 });
+      return new Response(`{"ok":true}`, { headers });
+    }
+
+    if (req.method === "GET" && url.pathname === "/votes") {
+      const c = comp(url.searchParams.get("comp"));
+      const out: Record<string, Record<string, number>> = {};
+      for (const cat of VOTE_CATS) {
+        out[cat] = JSON.parse((await env.BOARD.get(`v:${c}:${cat}`)) ?? "{}");
+      }
+      return new Response(JSON.stringify(out), {
+        headers: { ...headers, "Cache-Control": "public, max-age=30" },
+      });
     }
 
     if (req.method === "GET" && url.pathname === "/board") {

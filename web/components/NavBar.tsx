@@ -9,6 +9,7 @@ const LINKS: [string, string][] = [
   ["Clubs", "/clubs"],
   ["Premierships", "/premierships"],
   ["Honours", "/honours"],
+  ["Predict", "/predict"],
 ];
 
 /** Slim sitewide nav — gives the stats-site feel and strong internal linking. */
