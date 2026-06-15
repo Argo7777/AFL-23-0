@@ -335,7 +335,14 @@ export default function ResultView({
             eras={eras}
             meta={meta}
             initialRoster={roster}
-            oppLabels={oppLabels}
+            oppLabels={
+              // finals face the same era all-star sides as the season (drawn
+              // strongest-first), not random real club-seasons — sorted ascending
+              // by rating so FinalsCampaign's top-decile pick lands on the best.
+              opponents && opponents.length
+                ? [...opponents].sort((a, b) => a.rating - b.rating).map((o) => o.label)
+                : oppLabels
+            }
             onFlag={() => {
               setFlagWon(true);
               if (!replay) flagLastGame();
