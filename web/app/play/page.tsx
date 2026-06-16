@@ -49,6 +49,38 @@ function decodeShare(d: string) {
   }
 }
 
+/* ── the secret ──────────────────────────────────────────────────────────
+ * Search "Daniel Tomaro" for ANY club + era and the gaffer himself appears,
+ * eligible for every position. Field a whole team of him and the season is
+ * a foregone conclusion: 23-0 (12-0 in AFLW). One man, every guernsey. */
+const SECRET_ID = "secret/daniel-tomaro";
+const SECRET_NAME = "Daniel Tomaro";
+const isSecret = (p: PlayerEntry) => p.id === SECRET_ID;
+const SECRET_PLAYER: PlayerEntry = {
+  id: SECRET_ID,
+  n: SECRET_NAME,
+  g: 280,
+  h: 188,
+  y: [1897, 2026],
+  d0: 1897,
+  c: { "Every Club": 280 },
+  r: { DEF: 100, MID: 100, RUC: 100, FWD: 100 },
+  nat: "MID",
+  elig: ["DEF", "MID", "RUC", "FWD", "UTL"],
+  src: "secret",
+  u: 1.12,
+  s: 500_000, // low enough that 23 of him clear any salary cap
+  a: { bw: 99, bwW: 9, t10: 9, aa: 9, aas: 9, col: 9, c3: 9, pr: 9, rs: 9, acc: 100 },
+  st: { di: 35, gl: 3, mk: 8, tk: 8, ho: 25 },
+  sea: [],
+};
+/** does this query mean to summon the gaffer? matches "dan", "daniel",
+ *  "tomaro", "daniel tomaro" — any sub-phrase of his name (≥3 chars). */
+function wantsSecret(q: string): boolean {
+  const s = q.trim().toLowerCase();
+  return s.length >= 3 && SECRET_NAME.toLowerCase().includes(s);
+}
+
 function PlayInner() {
   const params = useSearchParams();
   const mode = (params.get("mode") as Mode) || "classic5";
@@ -135,7 +167,8 @@ function PlayInner() {
   const minSalary = meta?.salary.min ?? 100_000;
 
   const usedPlayerKeys = useMemo(
-    () => new Set(picks.map((p) => p.player.id.split("|")[0])),
+    // the gaffer is exempt — he's meant to fill every position at once
+    () => new Set(picks.filter((p) => !isSecret(p.player)).map((p) => p.player.id.split("|")[0])),
     [picks],
   );
 
@@ -184,7 +217,9 @@ function PlayInner() {
             for (let i = 0; i < st.p.length && i < totalPicks; i++) {
               const pk = st.p[i];
               const players = await loadPool(pk.d, pk.c);
-              const player = players.find((pl) => pl.id === pk.id);
+              const player = pk.id === SECRET_ID
+                ? SECRET_PLAYER
+                : players.find((pl) => pl.id === pk.id);
               if (player && pk.i < totalPicks) {
                 rebuilt[pk.i] = {
                   player, decade: pk.d, club: pk.c, slot: instances[pk.i].slot,
@@ -285,9 +320,27 @@ function PlayInner() {
     const opps = m === "spoon"
       ? null
       : buildOpponents(await loadTopRatings(), finalEras, filled.length, simSeed);
-    const result = simulateSeason(rating, values, simSeed, opps, labels, 10_000, {
-      seasonGames: comp === "aflw" ? 12 : 23,
-    });
+    const seasonGames = comp === "aflw" ? 12 : 23;
+    // the secret: a side of nothing but the gaffer never drops a game
+    const allSecret = filled.length === instances.length && filled.every((p) => isSecret(p.player));
+    const result: SimResult = allSecret
+      ? {
+          wins: seasonGames,
+          losses: 0,
+          perfectPct: 100,
+          userStrength: 1,
+          realPercentile: 100,
+          distribution: Array.from({ length: seasonGames + 1 }, (_, i) =>
+            i === seasonGames ? 100 : 0,
+          ),
+          story: Array.from({ length: seasonGames }, (_, i) => ({
+            round: `R${i + 1}`,
+            oppLabel: opps && opps.length ? opps[i % opps.length].label : (labels[i % labels.length] ?? "the field"),
+            oppIdx: opps && opps.length ? i % opps.length : null,
+            win: true,
+          })),
+        }
+      : simulateSeason(rating, values, simSeed, opps, labels, 10_000, { seasonGames });
     setSim(result);
     setOppLabels(labels);
     setOpponents(opps ?? []);
@@ -466,7 +519,12 @@ function PlayInner() {
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      return sorted.filter((p) => p.n.toLowerCase().includes(q)).slice(0, 30);
+      const out = sorted.filter((p) => p.n.toLowerCase().includes(q)).slice(0, 30);
+      // summon the gaffer for any club + era (top of the list, never deduped)
+      if (wantsSecret(search) && (!posFilter || SECRET_PLAYER.elig.includes(posFilter))) {
+        return [SECRET_PLAYER, ...out];
+      }
+      return out;
     }
     return sorted.slice(0, 20);
     // eslint-disable-next-line react-hooks/exhaustive-deps
