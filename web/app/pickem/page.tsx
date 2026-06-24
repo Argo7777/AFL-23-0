@@ -25,11 +25,12 @@ export default function PickemPage() {
   const [slip, setSlip] = useState<Leg[]>([]);
   const [posted, setPosted] = useState<Map<string, number>>(new Map()); // key -> Dabble line
   const [havePosted, setHavePosted] = useState(false);
+  const [mode, setMode] = useState<"dabble" | "manual">("dabble"); // auto-fill from Dabble vs all players
 
   useEffect(() => {
     loadProjections().then(setProj).catch(() => setErr("Projections feed not built."));
     loadPickem().then((pk) => {
-      if (!pk?.lines?.length) return;
+      if (!pk?.lines?.length) { setMode("manual"); return; } // no Dabble lines yet → manual
       const m = new Map<string, number>();
       for (const l of pk.lines) m.set(`${playerKey(l.player)}|${l.market}`, l.line);
       setPosted(m); setHavePosted(true);
@@ -49,15 +50,16 @@ export default function PickemPage() {
         if (!d || d.mean < 1) continue;
         const key = `${playerKey(p.player)}|${market}`;
         const postedLine = posted.get(key);
+        // Dabble mode: only the lines Dabble actually posted (auto-filled board)
+        if (mode === "dabble" && havePosted && postedLine == null && lines[key] == null) continue;
         const line = lines[key] ?? postedLine ?? Math.max(0.5, Math.round(d.mean) - 0.5);
         const pOver = probOver(d, line);
         const lean = pOver >= 0.5 ? "over" : "under";
         out.push({ key, p, match, line, pOver, lean, conf: Math.abs(pOver - 0.5), isPosted: postedLine != null });
       }
     }
-    // if Dabble has posted lines for this market, show those first
     return out.sort((a, b) => Number(b.isPosted) - Number(a.isPosted) || b.conf - a.conf);
-  }, [proj, market, matchFilter, lines, posted]);
+  }, [proj, market, matchFilter, lines, posted, mode, havePosted]);
 
   const inSlip = (key: string) => slip.find((l) => l.key === key);
   const toggleLeg = (key: string, player: string, line: number, side: "over" | "under", prob: number) =>
@@ -80,12 +82,26 @@ export default function PickemPage() {
       <p className="mb-3 text-xs text-slate-500">
         Pick’em is a fixed-multiplier parlay — pick {Object.keys(PICKEM_MULTIPLIERS)[0]}+ players over/under a
         line; the model rates each line and the slip below shows your combined model probability vs the payout.
-        {havePosted ? " Lines are Dabble’s where posted (★), else the model’s suggestion." : " Dabble hasn’t posted lines yet — showing model-suggested lines; edit any to match your screen."}
+        {mode === "dabble"
+          ? " Showing Dabble’s posted lines (★), auto-filled — edit any to match your screen."
+          : " Manual mode: every projected player at the model’s suggested line — edit any line."}
       </p>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        {/* auto-fill from Dabble vs manual entry */}
+        <div className="inline-flex rounded-lg border border-line bg-card p-0.5 text-xs">
+          <button onClick={() => setMode("dabble")} disabled={!havePosted}
+            className={"rounded-md px-3 py-1.5 font-bold transition " +
+              (mode === "dabble" ? "bg-grass text-pitch" : "text-slate-300 disabled:text-slate-600")}>
+            {havePosted ? "Dabble lines ★" : "Dabble (soon)"}
+          </button>
+          <button onClick={() => setMode("manual")}
+            className={"rounded-md px-3 py-1.5 font-bold transition " + (mode === "manual" ? "bg-grass text-pitch" : "text-slate-300")}>
+            Manual / all
+          </button>
+        </div>
         <select value={matchFilter} onChange={(e) => setMatchFilter(e.target.value)}
-          className="max-w-[60vw] rounded-lg border border-line bg-card px-2.5 py-2 text-base">
+          className="max-w-[55vw] rounded-lg border border-line bg-card px-2.5 py-2 text-base">
           <option value="all">All matches</option>
           {matches.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
