@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { allClubNames, clubData, clubSlug } from "@/lib/clubdb";
 import { clubRecord } from "@/lib/seasondb";
+import { clubProse } from "@/lib/prose";
 import { clubColors } from "@/lib/game/clubColors";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
@@ -53,6 +54,7 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
   ];
 
   const rec = clubRecord(c.name);
+  const prose = clubProse(c, rec);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -102,6 +104,15 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
           </p>
         </div>
       )}
+
+      <section className="mt-6 space-y-3 text-sm leading-relaxed text-slate-300">
+        <h2 className="font-display text-2xl font-black text-slate-100">
+          {c.name} — club history &amp; record
+        </h2>
+        {prose.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </section>
 
       <h2 className="mt-6 font-display text-2xl font-black">
         Greatest {c.name} players

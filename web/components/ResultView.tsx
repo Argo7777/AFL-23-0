@@ -11,7 +11,6 @@ import { coachName, LEADERBOARD_URL, setCoachName, submitScore } from "@/lib/gam
 import { finalsQualifyWins } from "@/lib/game/finals";
 import FinalsCampaign from "@/components/FinalsCampaign";
 import Confetti from "@/components/Confetti";
-import AdSlot, { AD_SLOTS } from "@/components/AdSlot";
 import { KOFI_URL } from "@/lib/affiliate";
 import TeamField from "@/components/TeamField";
 
@@ -488,8 +487,8 @@ export default function ResultView({
         </div>
       )}
 
-      {/* sponsor slot — well below the record and finals, never blocks play */}
-      <AdSlot slot={AD_SLOTS.result} className="mt-8" />
+      {/* No ad here: the result screen is interactive game output, not
+          publisher content — AdSense disallows ads on such screens. */}
 
       {/* opposing line-up viewer */}
       {oppView && (

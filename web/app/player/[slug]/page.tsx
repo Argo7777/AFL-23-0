@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { careerBySlug, notableCareers } from "@/lib/playerdb";
+import { playerProse } from "@/lib/prose";
 import { honours } from "@/lib/game/honours";
 import { clubColors } from "@/lib/game/clubColors";
 import AdSlot from "@/components/AdSlot";
@@ -46,6 +47,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
     .sort((a, b) => a[0] - b[0]);
   const hasDi = sea.some((s) => s[2] != null);
   const [c1, c2] = clubColors(clubs[0] ?? "");
+  const prose = playerProse(c);
 
   const ld = [
     {
@@ -99,6 +101,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
         </div>
       )}
 
+      <section className="mt-5 space-y-3 text-sm leading-relaxed text-slate-300">
+        {prose.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </section>
+
       <div className="mt-5 rounded-2xl border border-line bg-pitch-light p-4">
         <p className="text-[11px] uppercase tracking-widest text-slate-500">era-fair rating by decade</p>
         <div className="mt-2 grid gap-1">
@@ -142,8 +150,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ slug: s
           </div>
         </div>
       )}
-
-      <AdSlot slot={AD_SLOTS.content} className="mt-6" />
 
       {amazonBooksLink(c.name) && (
         <a

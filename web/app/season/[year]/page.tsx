@@ -7,6 +7,7 @@ import SeasonPicker from "@/components/SeasonPicker";
 import CompSwitch from "@/components/CompSwitch";
 import AdSlot from "@/components/AdSlot";
 import { AD_SLOTS } from "@/lib/ads";
+import { seasonProse } from "@/lib/prose";
 import {
   allSeasonYears, currentYear, seasonLadder, seasonMatches, seasonFinals,
   seasonPremier, slugMap, teamSlug,
@@ -48,6 +49,7 @@ export default async function SeasonPage({ params }: { params: Promise<{ year: s
   const finalsTeams = new Set(finals.flatMap((m) => [m.t1, m.t2])).size;
   const finalsCut = finalsTeams || (y >= 1994 ? 8 : y >= 1972 ? 5 : 4);
   const slugs = slugMap(matches.flatMap((m) => [m.t1, m.t2]));
+  const prose = seasonProse(y, rows, prem, finalsCut, current);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -77,6 +79,12 @@ export default async function SeasonPage({ params }: { params: Promise<{ year: s
           </p>
         </div>
       )}
+
+      <section className="mt-4 space-y-3 text-sm leading-relaxed text-slate-300">
+        {prose.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </section>
 
       <div className="mt-5">
         <SeasonPicker years={years} current={y} />

@@ -6,7 +6,6 @@ import { BASE_PATH, type Comp } from "@/lib/game/data";
 import { compFromUrl } from "@/lib/game/useComp";
 import { clubColors } from "@/lib/game/clubColors";
 import { fetchVotes, submitVote, type Tallies } from "@/lib/game/predict";
-import AdSlot, { AD_SLOTS } from "@/components/AdSlot";
 
 interface Option { name: string; club?: string }
 interface Category { key: string; title: string; desc: string; options: Option[] }
@@ -172,7 +171,6 @@ export default function PredictPage() {
           {cats.slice(0, 2).map((c) => (
             <CategoryCard key={c.key} cat={c} comp={comp} tally={tallies[c.key] ?? {}} picked={picks[c.key]} onVote={(ch) => vote(c.key, ch)} />
           ))}
-          <AdSlot slot={AD_SLOTS.content} />
           {cats.slice(2).map((c) => (
             <CategoryCard key={c.key} cat={c} comp={comp} tally={tallies[c.key] ?? {}} picked={picks[c.key]} onVote={(ch) => vote(c.key, ch)} />
           ))}

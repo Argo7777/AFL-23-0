@@ -8,6 +8,7 @@ import { AD_SLOTS } from "@/lib/ads";
 import { jsonLd as ldScript } from "@/lib/jsonld";
 import { aflwCareerBySlug, notableAflwCareers } from "@/lib/aflwplayerdb";
 import { aflwSeasonKeys } from "@/lib/aflwdb";
+import { aflwPlayerProse } from "@/lib/prose";
 
 // a player season is keyed by year, but season pages use season_keys (2022 →
 // 2022-s6/2022-s7). Resolve to a real page so the link never 404s.
@@ -48,6 +49,7 @@ export default async function AflwPlayerPage({ params }: { params: Promise<{ slu
   const yrs = c.seasons.length === 1 ? `${c.seasons[0].year}` : `${c.seasons[0].year}–${c.seasons[c.seasons.length - 1].year}`;
   const hasGoals = c.primaryPos === "FWD";
   const seasonKeys = aflwSeasonKeys();
+  const prose = aflwPlayerProse(c);
 
   const ld = [
     {
@@ -95,6 +97,12 @@ export default async function AflwPlayerPage({ params }: { params: Promise<{ slu
           </p>
         </div>
       </div>
+
+      <section className="mt-5 space-y-3 text-sm leading-relaxed text-slate-300">
+        {prose.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </section>
 
       <div className="mt-5 rounded-2xl border border-[#ff5e44]/30 bg-[#ff5e44]/5 p-4">
         <p className="text-[11px] uppercase tracking-widest text-[#ff8d79]">peak AFLW rating</p>

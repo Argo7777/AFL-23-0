@@ -578,6 +578,80 @@ export default function Home() {
           </p>
         )}
       </div>
+
+      {/* genuine publisher content — what the site is, how the ratings work, FAQ */}
+      <section className="mt-12 border-t border-line pt-8 text-sm leading-relaxed text-slate-300">
+        <h2 className="font-display text-2xl font-black text-slate-100">What is 23-0?</h2>
+        <p className="mt-3">
+          23-0 is a free, fan-made Australian rules football game and statistics site. You spin a
+          random VFL/AFL club and decade, draft a side from the players who actually played in that
+          era, then simulate a perfect 23-game, undefeated &ldquo;23&ndash;0&rdquo; season. Alongside
+          the game, the site is a complete reference to 130 years of league history: a page for every
+          club, every season from 1897 to today, and thousands of players — all built from real,
+          publicly available records rather than invented numbers.
+        </p>
+
+        <h2 className="font-display mt-7 text-2xl font-black text-slate-100">How players are rated</h2>
+        <p className="mt-3">
+          Every player carries an <b>era-fair rating</b> out of 100. The key idea is that a player is
+          measured only against the contemporaries they actually played with and against — the same
+          decade, the same conditions — using standardised statistical output, honours such as
+          Brownlow Medals, All-Australian selections and leading-goalkicker awards, and finals impact.
+          Because each era is scored within itself, a champion from the 1920s can be compared fairly
+          with one from the 2020s, even though the game they played looked very different. Ratings are
+          recomputed when a player is moved to a new position, reflecting how their output translates
+          to that role.
+        </p>
+
+        <h2 className="font-display mt-7 text-2xl font-black text-slate-100">Where the data comes from</h2>
+        <p className="mt-3">
+          All statistics are drawn from public records — primarily afltables.com, footywire.com and
+          Wikidata — and refreshed regularly through the season. Nothing on the site is a hand-tuned
+          or hardcoded rating; every number you see is derived from that underlying data. 23-0 is an
+          independent fan project and is not affiliated with, endorsed by, or associated with the AFL,
+          AFLW or any club.
+        </p>
+
+        <h2 className="font-display mt-7 text-2xl font-black text-slate-100">Frequently asked questions</h2>
+        <dl className="mt-3 space-y-4">
+          <div>
+            <dt className="font-display font-black text-slate-100">Is 23-0 free to play?</dt>
+            <dd className="mt-1">
+              Yes. Every game mode and every stats page is free, and you don&apos;t need an account.
+              The site is supported by advertising and voluntary donations.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-display font-black text-slate-100">What does &ldquo;23&ndash;0&rdquo; mean?</dt>
+            <dd className="mt-1">
+              A home-and-away AFL season is 23 rounds. Going &ldquo;23&ndash;0&rdquo; means winning
+              every single game — the perfect, undefeated season the game challenges you to build.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-display font-black text-slate-100">Which game mode should I start with?</dt>
+            <dd className="mt-1">
+              Classic 5 is the quickest way in — five spins, five picks. Full 23 builds a complete
+              23-player squad with re-rolls, and Salary Cap 23 adds a budget constraint for players
+              who want a tougher optimisation puzzle.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-display font-black text-slate-100">How often is the data updated?</dt>
+            <dd className="mt-1">
+              Player and result data refresh regularly during the season, so ladders, results and
+              ratings stay current as rounds are played.
+            </dd>
+          </div>
+        </dl>
+
+        <p className="mt-7 text-center text-xs text-slate-600">
+          Explore <Link href="/clubs" className="underline hover:text-ice">every club</Link> ·{" "}
+          <Link href="/seasons" className="underline hover:text-ice">every season</Link> ·{" "}
+          <Link href="/greats" className="underline hover:text-ice">the greats</Link> ·{" "}
+          <Link href="/about" className="underline hover:text-ice">about &amp; contact</Link>
+        </p>
+      </section>
     </main>
   );
 }
