@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BASE_PATH, loadMeta } from "@/lib/game/data";
 import AdSlot, { AD_SLOTS } from "@/components/AdSlot";
+import ModelTeaser from "@/components/ModelTeaser";
 import {
   Badge, badges, dailyNumber, GameRecord, readProfile, summary, todayMelbourne, todaysDaily,
 } from "@/lib/game/profile";
@@ -164,6 +165,9 @@ export default function Home() {
           mode &amp; eras configurable below · {meta?.decades.length ?? 14} decades
         </p>
       </header>
+
+      {/* model section — surfaced high so it's one of the first things people see */}
+      <ModelTeaser />
 
       {/* how it works */}
       <section className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4">
