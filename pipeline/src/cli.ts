@@ -89,6 +89,25 @@ async function main() {
       exportData();
       break;
     }
+    case "odds": {
+      // Live AFL player-prop odds (Sportsbet, Dabble, TAB, Ladbrokes) → odds-latest.json
+      const { fetchOdds } = await import("./scrape/odds.js");
+      await fetchOdds();
+      break;
+    }
+    case "projections": {
+      // Monte-Carlo player-stat projections from the AFL-Modelling artifact.
+      const { runProjections } = await import("./montecarlo/index.js");
+      const sIdx = args.indexOf("--sims");
+      const iIdx = args.indexOf("--in");
+      const oIdx = args.indexOf("--out");
+      runProjections({
+        nSims: sIdx !== -1 ? Number(args[sIdx + 1]) : undefined,
+        inPath: iIdx !== -1 ? args[iIdx + 1] : undefined,
+        outDir: oIdx !== -1 ? args[oIdx + 1] : undefined,
+      });
+      break;
+    }
     default:
       console.error(`Unknown command: ${command}`);
       process.exit(1);

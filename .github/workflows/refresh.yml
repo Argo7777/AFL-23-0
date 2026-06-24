@@ -25,6 +25,24 @@ jobs:
       - run: npm ci
       - name: Re-scrape current decade and recompute
         run: npm run refresh
+      - name: Refresh model projections (Monte-Carlo)
+        # Pull the latest projection inputs from the AFL-Modelling repo and
+        # simulate. Non-fatal: a model hiccup must never block the data deploy.
+        continue-on-error: true
+        run: |
+          curl -fsSL -o pipeline/data/projection_inputs.json \
+            https://raw.githubusercontent.com/DanielTomaro13/AFL-Modelling/main/artifacts/projection_inputs.json
+          npm run projections --prefix pipeline
+      - name: Refresh player-prop odds (Sportsbet, Dabble, TAB, Ladbrokes)
+        # Live odds for the Compare page. Sportsbet + Dabble need no auth; TAB and
+        # Ladbrokes activate when their secrets are set. Non-fatal — books may geo-block CI.
+        continue-on-error: true
+        env:
+          TAB_CLIENT_ID: ${{ secrets.TAB_CLIENT_ID }}
+          TAB_CLIENT_SECRET: ${{ secrets.TAB_CLIENT_SECRET }}
+          DABBLE_AUTH: ${{ secrets.DABBLE_AUTH }}
+          LAD_AFL_CATEGORY_ID: ${{ vars.LAD_AFL_CATEGORY_ID }}
+        run: npm run odds --prefix pipeline
       - name: Commit refreshed data
         run: |
           git config user.name "github-actions[bot]"

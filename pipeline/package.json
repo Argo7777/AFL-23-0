@@ -6,7 +6,10 @@
     "scrape": "tsx src/cli.ts scrape:afltables && tsx src/cli.ts scrape:awards && tsx src/cli.ts scrape:wikidata",
     "positions": "tsx src/cli.ts scrape:positions",
     "export": "tsx src/cli.ts export",
-    "refresh": "tsx src/cli.ts refresh"
+    "refresh": "tsx src/cli.ts refresh",
+    "projections": "tsx src/montecarlo/index.ts --in data/projection_inputs.json",
+    "projections:test": "tsx src/montecarlo/test.ts",
+    "odds": "tsx src/scrape/odds.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",

@@ -8,3 +8,18 @@ web/.next/
 web/out/
 .DS_Store
 .playwright-mcp/
+
+# Not part of this repo
+engine_ref/
+**/engine_ref/
+*.cs
+*.csproj
+*.sln
+*.csx
+
+# Secrets / bookmaker tokens — NEVER commit
+.env
+.env.*
+!.env.example
+*.token
+tokens.json
