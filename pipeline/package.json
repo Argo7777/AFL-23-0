@@ -9,7 +9,8 @@
     "refresh": "tsx src/cli.ts refresh",
     "projections": "tsx src/montecarlo/index.ts --in data/projection_inputs.json",
     "projections:test": "tsx src/montecarlo/test.ts",
-    "odds": "tsx src/scrape/odds.ts"
+    "odds": "tsx src/scrape/odds.ts",
+    "supercoach": "tsx src/scrape/supercoach.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import ModelNav from "@/components/ModelNav";
 import {
-  loadProjections, MARKETS, type Market,
+  loadProjections, MARKETS, playerKey, type Market,
   type ProjectionsOutput, type MatchProjection,
 } from "@/lib/modeldb";
+import { loadSuperCoach, scIndex, type ScPlayer } from "@/lib/supercoach";
 
 export default function ProjectionsPage() {
   const [data, setData] = useState<ProjectionsOutput | null>(null);
@@ -13,9 +14,11 @@ export default function ProjectionsPage() {
   const [mi, setMi] = useState(0);
   const [market, setMarket] = useState<Market>("disposals");
   const [q, setQ] = useState("");
+  const [sc, setSc] = useState<Map<string, ScPlayer>>(new Map());
 
   useEffect(() => {
     loadProjections().then(setData).catch((e) => setErr(String(e)));
+    loadSuperCoach().then((f) => setSc(scIndex(f)));
   }, []);
 
   if (err) return <Shell><p className="text-hot">Projections feed not built yet. Run the pipeline’s <code>projections</code> command.</p></Shell>;
@@ -60,10 +63,11 @@ export default function ProjectionsPage() {
         ))}
       </div>
 
-      <PlayerTable m={m} market={market} q={q} />
+      <PlayerTable m={m} market={market} q={q} sc={sc} />
       <p className="mt-4 text-xs text-slate-500">
         Mean / median / spread come from {data.n_sims.toLocaleString()} Monte-Carlo sims per match.
-        “Model” is the direct regressor expectation. Lines show P(over).
+        “Model” is the direct regressor expectation. Lines show P(over). “SC” is SuperCoach’s projected
+        score for the player — see the <a href="/supercoach" className="text-gold underline">SuperCoach hub</a>.
       </p>
     </Shell>
   );
@@ -113,7 +117,7 @@ function Bar({ label, pct, side }: { label: string; pct: number; side: "home" | 
   );
 }
 
-function PlayerTable({ m, market, q }: { m: MatchProjection; market: Market; q: string }) {
+function PlayerTable({ m, market, q, sc }: { m: MatchProjection; market: Market; q: string; sc: Map<string, ScPlayer> }) {
   const rows = useMemo(
     () => m.players
       .filter((p) => !q || p.player.toLowerCase().includes(q.toLowerCase()))
@@ -135,6 +139,7 @@ function PlayerTable({ m, market, q }: { m: MatchProjection; market: Market; q: 
             <th className="px-2 py-2 text-right">Model</th>
             <th className="px-2 py-2 text-right">Line</th>
             <th className="px-2 py-2 text-right">P(over)</th>
+            <th className="px-2 py-2 text-right" title="SuperCoach projected score">SC</th>
           </tr>
         </thead>
         <tbody>
@@ -142,6 +147,7 @@ function PlayerTable({ m, market, q }: { m: MatchProjection; market: Market; q: 
             const d = p.dist[market];
             const line = lineFor(d.mean);
             const pov = d.over[line.toFixed(1)] ?? (line < d.mean ? 1 : 0);
+            const scp = sc.get(playerKey(p.player));
             return (
               <tr key={p.player_id} className="border-t border-line/50 hover:bg-card-hover/40">
                 <td className="px-3 py-1.5">
@@ -160,6 +166,9 @@ function PlayerTable({ m, market, q }: { m: MatchProjection; market: Market; q: 
                   <span className={pov >= 0.5 ? "text-grass" : "text-slate-400"}>
                     {(pov * 100).toFixed(0)}%
                   </span>
+                </td>
+                <td className="px-2 py-1.5 text-right" title={scp ? `SC avg ${scp.avg}` : undefined}>
+                  {scp?.proj ? <span className="font-bold text-gold">{Math.round(scp.proj)}</span> : <span className="text-slate-600">—</span>}
                 </td>
               </tr>
             );

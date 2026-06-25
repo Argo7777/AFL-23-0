@@ -7,21 +7,25 @@ import {
   loadProjections, loadPickem, probOver, playerKey, PICKEM_MULTIPLIERS,
   type Market, type ProjectionsOutput, type PlayerProjection,
 } from "@/lib/modeldb";
+import { loadSuperCoach, scIndex, probScOver, type ScPlayer } from "@/lib/supercoach";
 
-// the stats Dabble Pick'em offers that we model
-const PICKEM_MARKETS: [Market, string][] = [
+// Dabble Pick'em markets. SuperCoach is special — priced from the SuperCoach
+// projection (not the Monte-Carlo model, which doesn't score SC points).
+type PkMarket = Market | "supercoach";
+const PICKEM_MARKETS: [PkMarket, string][] = [
   ["disposals", "Disposals"], ["dreamTeamPoints", "Fantasy"], ["goals", "Goals"],
-  ["marks", "Marks"], ["tackles", "Tackles"],
+  ["marks", "Marks"], ["tackles", "Tackles"], ["supercoach", "SuperCoach"],
 ];
 // full-name key so two players sharing an initial+surname never collide
 const normName = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
 
-interface Leg { key: string; player: string; market: Market; line: number; side: "over" | "under"; prob: number; }
+interface Leg { key: string; player: string; market: PkMarket; line: number; side: "over" | "under"; prob: number; }
 
 export default function PickemPage() {
   const [proj, setProj] = useState<ProjectionsOutput | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [market, setMarket] = useState<Market>("disposals");
+  const [sc, setSc] = useState<Map<string, ScPlayer>>(new Map());
+  const [market, setMarket] = useState<PkMarket>("disposals");
   const [matchFilter, setMatchFilter] = useState("all");
   const [lines, setLines] = useState<Record<string, number>>({}); // key -> overridden line
   const [slip, setSlip] = useState<Leg[]>([]);
@@ -34,6 +38,7 @@ export default function PickemPage() {
 
   useEffect(() => {
     loadProjections().then(setProj).catch(() => setErr("Projections feed not built."));
+    loadSuperCoach().then((f) => setSc(scIndex(f)));
     loadPickem().then((pk) => {
       if (!pk?.lines?.length) { setMode("manual"); return; } // no Dabble lines yet → manual
       const full = new Map<string, number>();
@@ -69,27 +74,41 @@ export default function PickemPage() {
 
   const rows = useMemo(() => {
     if (!proj) return [];
-    const out: Array<{ key: string; p: PlayerProjection; match: string; line: number; pOver: number; lean: "over" | "under"; conf: number; isPosted: boolean }> = [];
+    const out: Array<{ key: string; p: PlayerProjection; match: string; proj: number; line: number; pOver: number; lean: "over" | "under"; conf: number; isPosted: boolean }> = [];
     for (const mt of proj.matches) {
       const match = `${mt.home_team} v ${mt.away_team}`;
       if (matchFilter !== "all" && match !== matchFilter) continue;
       for (const p of mt.players) {
-        const d = p.dist[market];
-        if (!d || d.mean < 1) continue;
         if (q && !p.player.toLowerCase().includes(q.toLowerCase())) continue;
+        // projection + a P(over) function — from the SuperCoach feed for the SC
+        // market, otherwise from the Monte-Carlo distribution.
+        let projection: number;
+        let pOverFn: (line: number) => number;
+        if (market === "supercoach") {
+          const scp = sc.get(playerKey(p.player));
+          if (!scp) continue;
+          projection = scp.proj || scp.avg;
+          if (projection < 1) continue;
+          pOverFn = (line) => probScOver(scp, line);
+        } else {
+          const d = p.dist[market];
+          if (!d || d.mean < 1) continue;
+          projection = d.mean;
+          pOverFn = (line) => probOver(d, line);
+        }
         const key = `${playerKey(p.player)}|${market}`;
         const postedLine = postedLineFor(p.player, market);
         // Dabble mode: only the lines Dabble actually posted (auto-filled board)
         if (mode === "dabble" && havePosted && postedLine == null && lines[key] == null) continue;
-        const line = lines[key] ?? postedLine ?? Math.max(0.5, Math.round(d.mean) - 0.5);
-        const pOver = probOver(d, line);
+        const line = lines[key] ?? postedLine ?? Math.max(0.5, Math.round(projection) - 0.5);
+        const pOver = pOverFn(line);
         const lean = pOver >= 0.5 ? "over" : "under";
-        out.push({ key, p, match, line, pOver, lean, conf: Math.abs(pOver - 0.5), isPosted: postedLine != null });
+        out.push({ key, p, match, proj: projection, line, pOver, lean, conf: Math.abs(pOver - 0.5), isPosted: postedLine != null });
       }
     }
     const val = (r: typeof out[number]): number | string =>
       sort.key === "player" ? r.p.player
-      : sort.key === "proj" ? r.p.dist[market].mean : sort.key === "line" ? r.line
+      : sort.key === "proj" ? r.proj : sort.key === "line" ? r.line
       : sort.key === "over" ? r.pOver : sort.key === "under" ? 1 - r.pOver
       : r.conf; // default: model confidence (lean strength)
     out.sort((a, b) => {
@@ -99,7 +118,7 @@ export default function PickemPage() {
     });
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proj, market, matchFilter, lines, posted, keyCount, mode, havePosted, sort, q]);
+  }, [proj, sc, market, matchFilter, lines, posted, keyCount, mode, havePosted, sort, q]);
 
   const dabbleCount = useMemo(() => {
     if (!proj || !havePosted) return 0;
@@ -203,7 +222,7 @@ export default function PickemPage() {
                     <div className="font-semibold leading-tight">{r.p.player}{r.isPosted && <span title="Dabble posted line" className="ml-1 text-gold">★</span>}</div>
                     <div className="text-[11px] leading-tight text-slate-500">{r.match}</div>
                   </td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right text-slate-400">{r.p.dist[market].mean.toFixed(1)}</td>
+                  <td className="border-t border-line/40 px-2 py-2 text-right text-slate-400">{r.proj.toFixed(1)}</td>
                   <td className="border-t border-line/40 px-2 py-2 text-right">
                     <input inputMode="decimal" value={r.line}
                       onChange={(e) => setLines((p) => ({ ...p, [r.key]: Number(e.target.value) || r.line }))}

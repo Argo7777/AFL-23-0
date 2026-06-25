@@ -54,7 +54,7 @@ export interface PickemLine { player: string; event: string; market: string; lin
 // Dabble resultingType suffix (odds_on_pickem_<suffix>) → our model market key
 const PICKEM_RT: Record<string, string> = {
   disposals: "disposals", goals: "goals", marks: "marks", tackles: "tackles",
-  fantasy: "dreamTeamPoints",
+  fantasy: "dreamTeamPoints", supercoach: "supercoach",
 };
 const pickemLines: PickemLine[] = [];
 
@@ -244,7 +244,7 @@ async function fetchDabble(): Promise<OddsRow[]> {
     const seen = new Set<string>();
     for (const pp of sfd.playerProps ?? []) {
       const rt = rtById[pp.marketId] || "";
-      const mm = /^odds_on_pickem_(disposals|goals|marks|tackles|fantasy)$/.exec(rt);
+      const mm = /^odds_on_pickem_(disposals|goals|marks|tackles|fantasy|supercoach)$/.exec(rt);
       if (!mm || pp.value == null || !pp.playerName) continue;
       const stat = PICKEM_RT[mm[1]];
       const key = `${pp.playerName}|${stat}`;          // one main line per player+stat

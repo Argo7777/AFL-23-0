@@ -22,9 +22,18 @@ git pull --rebase --autostash origin main || { echo "$(ts) pull failed"; exit 1;
 
 npm run odds --prefix pipeline || { echo "$(ts) odds scrape failed"; exit 1; }
 
+# SuperCoach feed — prices/news move weekly-ish, so refresh at most once a day
+# (it pulls a per-round score series, which is heavier than the odds scrape).
+SC=web/public/data/supercoach-latest.json
+if [ ! -f "$SC" ] || [ -n "$(find "$SC" -mmin +1200 2>/dev/null)" ]; then
+  echo "$(ts) refreshing supercoach…"
+  npm run supercoach --prefix pipeline || echo "$(ts) supercoach scrape failed (keeping previous)"
+fi
+
 git add web/public/data/odds-latest.json \
         web/public/data/pickem-latest.json \
-        web/public/data/ou-latest.json
+        web/public/data/ou-latest.json \
+        "$SC"
 if git diff --cached --quiet; then
   echo "$(ts) no odds changes — nothing to push"
   exit 0
