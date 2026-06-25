@@ -46,7 +46,10 @@ export default function OverUndersPage() {
 
   const rows = useMemo(() => {
     if (!proj) return [];
-    const out = [];
+    const out: Array<{
+      p: PlayerProjection; match: string; proj: number; line: number; over: number; under: number;
+      bestOver: number | undefined; bestBook: string | undefined; lean: string; edge: number; evOver: number;
+    }> = [];
     for (const mt of proj.matches) {
       const match = `${mt.home_team} v ${mt.away_team}`;
       if (matchFilter !== "all" && match !== matchFilter) continue;

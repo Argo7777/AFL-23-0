@@ -62,7 +62,7 @@ export default function ComparePage() {
   const rows = useMemo(() => {
     if (!odds || !index.size) return [];
     const groups = new Map<string, {
-      player: string; match: string; line: number; proj: number; prices: Record<string, number>; modelP: number;
+      pkey: string; player: string; match: string; line: number; proj: number; prices: Record<string, number>; modelP: number;
     }>();
     for (const r of odds.rows) {
       if (r.market !== market || r.price < 1.1 || r.price > 6.0) continue;
