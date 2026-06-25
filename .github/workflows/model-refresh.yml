@@ -1,10 +1,14 @@
-name: Model & odds refresh
+name: Model refresh
 
 # Every 3h: pull the latest projection inputs (lineups) from AFL-Modelling, run the
-# Monte-Carlo, refresh player-prop odds, then rebuild and deploy the site. This is
-# the fast loop that keeps projections/odds/lineups current between the weekly
-# historical re-scrape in refresh.yml. Offset 30 min past the hour so AFL-Modelling's
-# every-3h predict job has refreshed projection_inputs.json first.
+# Monte-Carlo, then rebuild and deploy the site. This is the fast loop that keeps
+# projections/lineups current between the weekly historical re-scrape in refresh.yml.
+# Offset 30 min past the hour so AFL-Modelling's every-3h predict job has refreshed
+# projection_inputs.json first.
+#
+# Player-prop ODDS are NOT scraped here: the AU books (Sportsbet/Dabble/TAB) geo-block
+# GitHub's US runners, so CI would only ever capture Ladbrokes. Odds are scraped from
+# an AU IP by a local launchd job (scripts/odds-cron) and pushed separately.
 
 on:
   schedule:
@@ -37,23 +41,14 @@ jobs:
             https://raw.githubusercontent.com/DanielTomaro13/AFL-Modelling/main/artifacts/projection_inputs.json
           npm run projections --prefix pipeline
 
-      - name: Refresh player-prop odds (Sportsbet, Dabble, TAB, Ladbrokes)
-        # Non-fatal — books may geo-block CI. Sportsbet + Dabble need no auth;
-        # TAB and Ladbrokes activate when their secrets/vars are set.
-        continue-on-error: true
-        env:
-          TAB_CLIENT_ID: ${{ secrets.TAB_CLIENT_ID }}
-          TAB_CLIENT_SECRET: ${{ secrets.TAB_CLIENT_SECRET }}
-          DABBLE_AUTH: ${{ secrets.DABBLE_AUTH }}
-          LAD_AFL_CATEGORY_ID: ${{ vars.LAD_AFL_CATEGORY_ID }}
-        run: npm run odds --prefix pipeline
-
-      - name: Commit refreshed projections + odds
+      - name: Commit refreshed projections
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Odds files are owned by the local cron; they're unchanged here so the
+          # add only stages projection files.
           git add pipeline/data/projection_inputs.json web/public/data
-          git diff --cached --quiet || git commit -m "Model & odds refresh ($(date -u +%Y-%m-%dT%H:%MZ))"
+          git diff --cached --quiet || git commit -m "Model refresh ($(date -u +%Y-%m-%dT%H:%MZ))"
           git push
 
       # GITHUB_TOKEN pushes don't trigger deploy.yml, so build + publish here too.

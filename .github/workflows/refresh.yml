@@ -33,16 +33,9 @@ jobs:
           curl -fsSL -o pipeline/data/projection_inputs.json \
             https://raw.githubusercontent.com/DanielTomaro13/AFL-Modelling/main/artifacts/projection_inputs.json
           npm run projections --prefix pipeline
-      - name: Refresh player-prop odds (Sportsbet, Dabble, TAB, Ladbrokes)
-        # Live odds for the Compare page. Sportsbet + Dabble need no auth; TAB and
-        # Ladbrokes activate when their secrets are set. Non-fatal — books may geo-block CI.
-        continue-on-error: true
-        env:
-          TAB_CLIENT_ID: ${{ secrets.TAB_CLIENT_ID }}
-          TAB_CLIENT_SECRET: ${{ secrets.TAB_CLIENT_SECRET }}
-          DABBLE_AUTH: ${{ secrets.DABBLE_AUTH }}
-          LAD_AFL_CATEGORY_ID: ${{ vars.LAD_AFL_CATEGORY_ID }}
-        run: npm run odds --prefix pipeline
+      # Player-prop odds are NOT scraped here — the AU books geo-block GitHub's US
+      # runners (only Ladbrokes responds). Odds are scraped from an AU IP by the
+      # local launchd job (scripts/odds-cron) and pushed separately.
       - name: Commit refreshed data
         run: |
           git config user.name "github-actions[bot]"
