@@ -33,6 +33,7 @@ export default function ComparePage() {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "ev", dir: -1 });
   const [q, setQ] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [manual, setManual] = useState<Record<string, string>>({}); // `${pkey}|${line}` -> typed price
 
   useEffect(() => {
     loadProjections().then(setProj).catch(() => setErr("Projections feed not built."));
@@ -81,11 +82,13 @@ export default function ComparePage() {
       }
       g.prices[r.book] = Math.max(g.prices[r.book] ?? 0, r.price);
     }
-    // price each line-row
+    // price each line-row — a typed manual price counts as another book ("manual")
     const lineRows = [...groups.values()].map((g) => {
+      const mk = Number(manual[`${g.pkey}|${g.line}`]);
+      const prices = Number.isFinite(mk) && mk > 1 ? { ...g.prices, manual: mk } : g.prices;
       let bestBook = "", best = 0;
-      for (const [b, p] of Object.entries(g.prices)) if (p > best) { best = p; bestBook = b; }
-      return { ...g, bestBook, best, fair: fairOdds(g.modelP), edge: (g.modelP - impliedProb(best)) * 100,
+      for (const [b, p] of Object.entries(prices)) if (p > best) { best = p; bestBook = b; }
+      return { ...g, prices, bestBook, best, fair: fairOdds(g.modelP), edge: (g.modelP - impliedProb(best)) * 100,
         evVal: ev(g.modelP, best), stake: recommendedStake(g.modelP, best, bankroll, kFrac) };
     });
     // collapse: one entry per player; "best" = its top-EV line, keep all lines for expand
@@ -110,7 +113,7 @@ export default function ComparePage() {
       return (va - (vb as number)) * sort.dir;
     });
     return filtered;
-  }, [odds, index, market, matchFilter, hidden, posOnly, bankroll, kFrac, sort, q]);
+  }, [odds, index, market, matchFilter, hidden, posOnly, bankroll, kFrac, sort, q, manual]);
 
   const sortBy = (key: string) =>
     setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) as 1 | -1 : (key === "player" || key === "line" ? 1 : -1) }));
@@ -137,6 +140,12 @@ export default function ComparePage() {
           return <td key={b} className={"border-t border-line/40 px-2 py-2 text-right " +
             (isBest ? "font-bold text-grass" : p ? "text-slate-200" : "text-slate-600")}>{p ? p.toFixed(2) : "–"}</td>;
         })}
+        <td className="border-t border-line/40 px-2 py-2 text-right">
+          <input inputMode="decimal" placeholder="$" value={manual[`${r.pkey}|${r.line}`] ?? ""}
+            onChange={(e) => setManual((prev) => ({ ...prev, [`${r.pkey}|${r.line}`]: e.target.value }))}
+            className={"w-16 rounded border bg-card px-1 py-1 text-right text-base " +
+              (r.bestBook === "manual" ? "border-grass/50 font-bold text-grass" : "border-line text-slate-200")} />
+        </td>
         <td className={"border-t border-line/40 px-2 py-2 text-right font-bold " + (pos ? "text-grass" : "text-slate-400")}>
           {r.evVal > 0 ? "+" : ""}{(r.evVal * 100).toFixed(0)}%
           {r.evVal > 0.15 && <span title="Large edge — usually a late lineup change or a soft/mismatched line, not free money." className="ml-0.5 text-gold">⚠</span>}
@@ -210,6 +219,7 @@ export default function ComparePage() {
               <Th k="model" label="Model" sort={sort} onSort={sortBy} />
               <Th k="fair" label="My $" sort={sort} onSort={sortBy} />
               {books.map((b) => <Th key={b} k={b} label={BOOK_LABEL[b] ?? b} sort={sort} onSort={sortBy} />)}
+              <th className="bg-pitch px-2 py-2 text-right font-bold uppercase tracking-wide text-slate-400">Manual</th>
               <Th k="ev" label="EV" sort={sort} onSort={sortBy} />
               <Th k="stake" label="Stake" sort={sort} onSort={sortBy} />
             </tr>
@@ -257,6 +267,7 @@ export default function ComparePage() {
         One row per player showing their <b>best-value line</b> — tap <b className="text-slate-300">▸</b> to
         see every alternate line. Tap a column header to sort. <b className="text-ice">Proj</b> is the model’s
         projection; <b>My $</b> its fair price; best book price is <span className="text-grass">green</span>.
+        Type your own price in <b>Manual</b> (e.g. a book we don’t scrape) and it competes for best price.
         EV &amp; Stake use the best price ({kFrac === 1 ? "full" : kFrac === 0.5 ? "half" : "quarter"}-Kelly,
         ${bankroll.toLocaleString()} bankroll, full Kelly clamped to 20%). Big edges (⚠) usually mean a late
         lineup change or a soft line, not free money. {rows.length.toLocaleString()} players (top 250).

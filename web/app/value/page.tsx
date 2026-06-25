@@ -5,23 +5,24 @@ import ModelNav from "@/components/ModelNav";
 import {
   loadProjections, MARKETS, probOver, playerKey, type Market, type ProjectionsOutput,
 } from "@/lib/modeldb";
-import { devigTwoWay, impliedProb, ev, edgePct, fairOdds, recommendedStake } from "@/lib/staking";
+import { impliedProb, ev, edgePct, fairOdds, recommendedStake } from "@/lib/staking";
 import { BASE_PATH } from "@/lib/game/data";
 import Disclaimer from "@/components/Disclaimer";
 
 interface OddsRow { book: string; market: string; player: string; line: number; price: number }
 interface OddsFeed { generated: string; rows: OddsRow[] }
-type Override = { line?: string; over?: string; under?: string };
-const keyOf = (pid: string, market: string) => `${pid}|${market}`;
+const BOOK_LABEL: Record<string, string> = { sportsbet: "Sportsbet", tab: "TAB", ladbrokes: "Ladbrokes", dabble: "Dabble" };
 
+/** Read-only value board: the model's price vs the best book price, with the edge,
+ *  EV and recommended Kelly stake. To plug in your own price, use Compare odds. */
 export default function ValuePage() {
   const [data, setData] = useState<ProjectionsOutput | null>(null);
   const [odds, setOdds] = useState<OddsFeed | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [mi, setMi] = useState(0);
   const [market, setMarket] = useState<Market>("disposals");
-  const [ov, setOv] = useState<Record<string, Override>>({}); // manual overrides
   const [q, setQ] = useState("");
+  const [posOnly, setPosOnly] = useState(true);
 
   const [bankroll, setBankroll] = useState(1000);
   const [kFrac, setKFrac] = useState(0.25);
@@ -48,7 +49,6 @@ export default function ValuePage() {
     }
     return m;
   }, [odds]);
-  const BOOK_LABEL: Record<string, string> = { sportsbet: "Sportsbet", tab: "TAB", ladbrokes: "Ladbrokes", dabble: "Dabble" };
 
   const m = data?.matches[mi];
   const computed = useMemo(() => {
@@ -56,37 +56,21 @@ export default function ValuePage() {
     return m.players.filter((p) => !q || p.player.toLowerCase().includes(q.toLowerCase())).map((p) => {
       const d = p.dist[market];
       const lines = book.get(`${playerKey(p.player)}|${market}`); // line -> best over
-      const modelLine = Math.max(0.5, Math.round(d.mean) - 0.5);
-      // default line = the book line nearest the projection, else the model line
-      let defLine = modelLine;
-      if (lines && lines.size) {
-        defLine = [...lines.keys()].reduce((best, l) => Math.abs(l - d.mean) < Math.abs(best - d.mean) ? l : best, [...lines.keys()][0]);
-      }
-      const o = ov[keyOf(p.player_id, market)] ?? {};
-      const line = o.line != null && o.line !== "" ? Number(o.line) : defLine;
-      const auto = lines?.get(line); // {price, book} at the chosen line (auto-fill)
-      const autoOver = auto?.price;
-      const overOdds = o.over != null && o.over !== "" ? Number(o.over) : (autoOver ?? NaN);
-      const underOdds = o.under != null && o.under !== "" ? Number(o.under) : NaN;
-
+      if (!lines || !lines.size) return null;
+      // line nearest the projection, where the book actually prices it
+      const line = [...lines.keys()].reduce((best, l) => Math.abs(l - d.mean) < Math.abs(best - d.mean) ? l : best, [...lines.keys()][0]);
+      const auto = lines.get(line)!;                 // { price, book } best over at that line
+      const overOdds = auto.price;
       const modelP = probOver(d, line);
-      let marketP = overOdds > 1 ? impliedProb(overOdds) : NaN;
-      if (overOdds > 1 && underOdds > 1) marketP = devigTwoWay(overOdds, underOdds)[0];
-      const evVal = overOdds > 1 ? ev(modelP, overOdds) : NaN;
-      const edge = Number.isFinite(marketP) ? edgePct(modelP, marketP) : NaN;
-      const stake = overOdds > 1 ? recommendedStake(modelP, overOdds, bankroll, kFrac) : 0;
-      const isAuto = !o.over && autoOver != null;
-      const overStr = o.over != null && o.over !== "" ? o.over : (autoOver != null ? autoOver.toFixed(2) : "");
-      // where the value is: the Over is +EV at this price → name the book
-      const valueAt = Number.isFinite(evVal) && evVal > 0
-        ? `Over${isAuto && auto ? ` · ${BOOK_LABEL[auto.book] ?? auto.book}` : ""}` : "";
-      return { p, line: String(o.line ?? defLine), overStr, underStr: o.under ?? "", proj: d.mean,
-        modelP, evVal, edge, overOdds, stake, isAuto, valueAt };
-    }).sort((a, b) => (Number.isFinite(b.evVal) ? b.evVal : -9) - (Number.isFinite(a.evVal) ? a.evVal : -9));
-  }, [m, market, ov, book, bankroll, kFrac, q]);
-
-  const setRow = (pid: string, patch: Override) =>
-    setOv((prev) => ({ ...prev, [keyOf(pid, market)]: { ...prev[keyOf(pid, market)], ...patch } }));
+      const marketP = impliedProb(overOdds);
+      const evVal = ev(modelP, overOdds);
+      const edge = edgePct(modelP, marketP);
+      const stake = recommendedStake(modelP, overOdds, bankroll, kFrac);
+      return { p, line, overOdds, book: auto.book, proj: d.mean, modelP, evVal, edge, stake };
+    }).filter((r): r is NonNullable<typeof r> => r != null)
+      .filter((r) => (posOnly ? r.evVal > 0 : true))
+      .sort((a, b) => b.evVal - a.evVal);
+  }, [m, market, book, bankroll, kFrac, q, posOnly]);
 
   if (err) return <Shell><p className="text-hot">Projections feed not built yet.</p></Shell>;
   if (!data || !m) return <Shell><p className="text-slate-400">Loading…</p></Shell>;
@@ -100,6 +84,10 @@ export default function ValuePage() {
         </select>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player…"
           className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-base" />
+        <label className="flex items-center gap-1.5 text-xs text-slate-400">
+          <input type="checkbox" checked={posOnly} onChange={(e) => setPosOnly(e.target.checked)}
+            className="h-4 w-4 accent-grass" /> +EV only
+        </label>
         <label className="text-xs text-slate-400">Bankroll $
           <input type="number" inputMode="decimal" value={bankroll} min={0}
             onChange={(e) => setBankroll(Number(e.target.value))}
@@ -121,7 +109,7 @@ export default function ValuePage() {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line [-webkit-overflow-scrolling:touch]">
-        <table className="w-full min-w-[46rem] text-sm">
+        <table className="w-full min-w-[40rem] text-sm">
           <thead className="bg-pitch-light text-xs uppercase text-slate-400">
             <tr>
               <th className="px-3 py-2 text-left">Player</th>
@@ -129,8 +117,7 @@ export default function ValuePage() {
               <th className="px-2 py-2 text-right">Line</th>
               <th className="px-2 py-2 text-right">Model</th>
               <th className="px-2 py-2 text-right">My $</th>
-              <th className="px-2 py-2 text-right">Over $</th>
-              <th className="px-2 py-2 text-right">Under $</th>
+              <th className="px-2 py-2 text-right">Best Over $</th>
               <th className="px-2 py-2 text-right">Edge</th>
               <th className="px-2 py-2 text-right">EV</th>
               <th className="px-2 py-2 text-right">Stake</th>
@@ -139,34 +126,28 @@ export default function ValuePage() {
           </thead>
           <tbody>
             {computed.map((row) => {
-              const pos = Number.isFinite(row.evVal) && row.evVal > 0;
+              const pos = row.evVal > 0;
               const k = `${mi}|${market}|${row.p.player_id}`;
               return (
                 <tr key={k} className={"border-t border-line/50 " + (pos ? "bg-grass/5" : "")}>
                   <td className="px-3 py-1.5"><span className="font-semibold">{row.p.player}</span>
                     <span className="ml-1.5 text-xs text-slate-500">{row.p.team}</span></td>
                   <td className="px-2 py-1.5 text-right text-ice">{row.proj.toFixed(1)}</td>
-                  <td className="px-2 py-1.5 text-right">
-                    <input value={row.line} onChange={(e) => setRow(row.p.player_id, { line: e.target.value })}
-                      className="w-14 rounded border border-line bg-card px-1 py-1 text-right text-base" /></td>
+                  <td className="px-2 py-1.5 text-right text-slate-300">{row.line}+</td>
                   <td className="px-2 py-1.5 text-right text-slate-300">{(row.modelP * 100).toFixed(0)}%</td>
                   <td className="px-2 py-1.5 text-right text-slate-400">{fairOdds(row.modelP).toFixed(2)}</td>
                   <td className="px-2 py-1.5 text-right">
-                    <input inputMode="decimal" placeholder="$" value={row.overStr}
-                      onChange={(e) => setRow(row.p.player_id, { over: e.target.value })}
-                      className={"w-16 rounded border bg-card px-1 py-1 text-right text-base " + (row.isAuto ? "border-grass/40 text-grass" : "border-line")} /></td>
-                  <td className="px-2 py-1.5 text-right">
-                    <input inputMode="decimal" placeholder="$" value={row.underStr}
-                      onChange={(e) => setRow(row.p.player_id, { under: e.target.value })}
-                      className="w-16 rounded border border-line bg-card px-1 py-1 text-right text-base" /></td>
+                    <span className={pos ? "font-bold text-grass" : "text-slate-200"}>{row.overOdds.toFixed(2)}</span>
+                    <span className="ml-1 text-[10px] text-slate-500">{BOOK_LABEL[row.book] ?? row.book}</span>
+                  </td>
                   <td className={"px-2 py-1.5 text-right " + (row.edge > 0 ? "text-grass" : "text-slate-400")}>
-                    {Number.isFinite(row.edge) ? `${row.edge > 0 ? "+" : ""}${row.edge.toFixed(1)}` : "–"}</td>
+                    {row.edge > 0 ? "+" : ""}{row.edge.toFixed(1)}</td>
                   <td className={"px-2 py-1.5 text-right font-bold " + (pos ? "text-grass" : "text-slate-400")}>
-                    {Number.isFinite(row.evVal) ? `${row.evVal > 0 ? "+" : ""}${(row.evVal * 100).toFixed(0)}%` : "–"}</td>
+                    {row.evVal > 0 ? "+" : ""}{(row.evVal * 100).toFixed(0)}%</td>
                   <td className="px-2 py-1.5 text-right font-bold text-gold">{row.stake > 0 ? `$${row.stake.toFixed(0)}` : "–"}</td>
                   <td className="px-2 py-1.5 text-left whitespace-nowrap">
-                    {row.valueAt
-                      ? <span className="rounded bg-grass/15 px-1.5 py-0.5 text-xs font-bold text-grass">{row.valueAt}</span>
+                    {pos
+                      ? <span className="rounded bg-grass/15 px-1.5 py-0.5 text-xs font-bold text-grass">Over · {BOOK_LABEL[row.book] ?? row.book}</span>
                       : <span className="text-slate-600">–</span>}
                   </td>
                 </tr>
@@ -175,12 +156,17 @@ export default function ValuePage() {
           </tbody>
         </table>
       </div>
+
+      {computed.length === 0 && (
+        <p className="py-6 text-center text-sm text-slate-500">No {posOnly ? "+EV " : ""}priced lines for this match yet.</p>
+      )}
       <p className="mt-3 text-xs text-slate-500">
-        <span className="text-grass">Green</span> Over prices are auto-filled from the best book; type to
-        override, or add an Under to de-vig. Edit the line and the book price re-fills for that line.
-        The <b className="text-grass">Value</b> column names the bet when it’s +EV — e.g. “Over · TAB” is the
-        side and book to take. <b>My $</b> is the model’s fair price; recommended {kFrac === 1 ? "full" : kFrac === 0.5 ? "half" : "quarter"}-Kelly
-        stake from your ${bankroll.toLocaleString()} bankroll (full Kelly clamped to 20%).
+        Auto-filled from the best book price each line — no manual entry here; to plug in your own
+        price use <b>Compare odds</b>. <b className="text-ice">Proj</b> is the model’s projection,
+        <b> My $</b> its fair price. <b className="text-grass">Edge</b>/<b className="text-grass">EV</b> compare
+        the model’s probability to the book’s implied price; the <b className="text-grass">Value</b> tag names the
+        side and book. Stake is {kFrac === 1 ? "full" : kFrac === 0.5 ? "half" : "quarter"}-Kelly from your
+        ${bankroll.toLocaleString()} bankroll (full Kelly clamped to 20%).
       </p>
       <Disclaimer />
     </Shell>
@@ -191,7 +177,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-5xl px-3 py-5">
       <h1 className="font-display mb-1 text-2xl font-black text-grass">Value &amp; staking</h1>
-      <p className="mb-4 text-sm text-slate-400">Model price vs the market — auto-filled, with manual override and Kelly staking.</p>
+      <p className="mb-4 text-sm text-slate-400">Where the model beats the market — best book price, edge, EV and Kelly stake.</p>
       <ModelNav />
       {children}
     </main>

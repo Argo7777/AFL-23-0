@@ -1,27 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { loadProjections, type ProjectionsOutput } from "@/lib/modeldb";
+import { loadProjections, probOver, playerKey, MARKETS, type ProjectionsOutput } from "@/lib/modeldb";
+import { ev } from "@/lib/staking";
+import { BASE_PATH } from "@/lib/game/data";
 
 const LINKS: [string, string][] = [
-  ["Projections", "/projections"],
-  ["Fantasy XXII", "/fantasy"],
-  ["Lineups", "/lineups"],
+  ["Value", "/value"],
   ["Compare odds", "/compare"],
+  ["Projections", "/projections"],
   ["Pick’em", "/pickem"],
+  ["Over / Unders", "/overunders"],
 ];
 
-/** Homepage teaser for the model section — live top projections + quick links. */
+interface OddsRow { book: string; market: string; player: string; line: number; price: number }
+const MARKET_LABEL: Record<string, string> = Object.fromEntries(MARKETS);
+
+/** Homepage teaser for the model section — leads with the live top value bets. */
 export default function ModelTeaser() {
   const [data, setData] = useState<ProjectionsOutput | null>(null);
-  useEffect(() => { loadProjections().then(setData).catch(() => {}); }, []);
+  const [odds, setOdds] = useState<OddsRow[] | null>(null);
+  useEffect(() => {
+    loadProjections().then(setData).catch(() => {});
+    fetch(`${BASE_PATH}/data/odds-latest.json`).then((r) => r.ok ? r.json() : null)
+      .then((d) => setOdds(d?.rows ?? null)).catch(() => {});
+  }, []);
 
-  const top = data
-    ? [...data.matches.flatMap((m) => m.players)]
-        .sort((a, b) => b.dist.dreamTeamPoints.mean - a.dist.dreamTeamPoints.mean)
-        .slice(0, 6)
-    : [];
+  // best over price per player|market|line, then top +EV over bets vs the model
+  const value = useMemo(() => {
+    if (!data || !odds) return [];
+    const proj = new Map<string, { player: string; team: string; dist: ProjectionsOutput["matches"][number]["players"][number]["dist"] }>();
+    data.matches.forEach((mt) => mt.players.forEach((p) => proj.set(playerKey(p.player), { player: p.player, team: p.team, dist: p.dist })));
+    const best = new Map<string, { price: number }>(); // pkey|market|line -> best over
+    for (const r of odds) {
+      if (r.price < 1.3 || r.price > 4) continue;
+      const k = `${playerKey(r.player)}|${r.market}|${r.line}`;
+      const cur = best.get(k);
+      if (!cur || r.price > cur.price) best.set(k, { price: r.price });
+    }
+    const picks: Array<{ player: string; team: string; market: string; line: number; price: number; evVal: number }> = [];
+    for (const [k, b] of best) {
+      const [pkey, market, lineStr] = k.split("|");
+      const hit = proj.get(pkey); if (!hit) continue;
+      const d = (hit.dist as Record<string, { mean: number; sd: number } | undefined>)[market]; if (!d) continue;
+      const line = Number(lineStr);
+      const evVal = ev(probOver(d as never, line), b.price);
+      if (evVal > 0) picks.push({ player: hit.player, team: hit.team, market, line, price: b.price, evVal });
+    }
+    // one best pick per player, top 4 by EV
+    const byPlayer = new Map<string, typeof picks[number]>();
+    for (const p of picks) { const e = byPlayer.get(p.player); if (!e || p.evVal > e.evVal) byPlayer.set(p.player, p); }
+    return [...byPlayer.values()].sort((a, b) => b.evVal - a.evVal).slice(0, 4);
+  }, [data, odds]);
 
   return (
     <section className="mt-8 rounded-2xl border border-grass/30 bg-gradient-to-b from-grass/10 to-pitch-light p-5">
@@ -32,28 +63,31 @@ export default function ModelTeaser() {
           </div>
           <p className="mt-0.5 text-xs text-slate-400 sm:text-sm">
             Player projections for 10 markets, a bookmaker odds comparison (Sportsbet · TAB ·
-            Ladbrokes), Dabble Pick’em, value edges &amp; Kelly staking.
+            Ladbrokes · Dabble), Pick’em, and the value edges below with Kelly staking.
           </p>
         </div>
-        <Link href="/projections"
+        <Link href="/value"
           className="shrink-0 rounded-lg bg-grass px-3 py-2 font-display text-xs font-black uppercase tracking-wide text-pitch transition hover:bg-lime-300">
-          Open →
+          Find value →
         </Link>
       </div>
 
-      {top.length > 0 && (
+      {value.length > 0 && (
         <>
-          <div className="mt-3 text-[11px] uppercase tracking-wide text-slate-500">Top projected fantasy this round</div>
+          <div className="mt-3 text-[11px] uppercase tracking-wide text-slate-500">💰 Top value right now — model vs the market</div>
           <div className="-mx-1 mt-1 flex gap-2 overflow-x-auto px-1 pb-1 [-webkit-overflow-scrolling:touch]">
-            {top.map((p) => (
-              <div key={p.player_id} className="min-w-[8.5rem] shrink-0 rounded-lg border border-line bg-card px-3 py-2">
-                <div className="truncate text-sm font-semibold">{p.player}</div>
-                <div className="truncate text-[11px] text-slate-500">{p.team} · {p.role}</div>
-                <div className="mt-1 text-sm font-bold text-grass">
-                  {p.dist.dreamTeamPoints.mean.toFixed(0)}
-                  <span className="ml-1 text-[11px] font-normal text-slate-500">proj FP</span>
+            {value.map((v, i) => (
+              <Link key={i} href="/value" className="min-w-[10rem] shrink-0 rounded-lg border border-grass/40 bg-card px-3 py-2 transition hover:bg-card-hover">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate text-sm font-semibold">{v.player}</div>
+                  <div className="shrink-0 rounded bg-grass/15 px-1.5 py-0.5 text-[11px] font-bold text-grass">+{(v.evVal * 100).toFixed(0)}%</div>
                 </div>
-              </div>
+                <div className="mt-0.5 truncate text-[11px] text-slate-500">{v.team}</div>
+                <div className="mt-1 text-sm font-bold text-grass">
+                  {v.line}+ {MARKET_LABEL[v.market] ?? v.market}
+                  <span className="ml-1 text-[11px] font-normal text-slate-400">@ {v.price.toFixed(2)}</span>
+                </div>
+              </Link>
             ))}
           </div>
         </>

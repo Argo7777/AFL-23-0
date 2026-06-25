@@ -13,6 +13,8 @@ const PICKEM_MARKETS: [Market, string][] = [
   ["disposals", "Disposals"], ["dreamTeamPoints", "Fantasy"], ["goals", "Goals"],
   ["marks", "Marks"], ["tackles", "Tackles"],
 ];
+// full-name key so two players sharing an initial+surname never collide
+const normName = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
 
 interface Leg { key: string; player: string; market: Market; line: number; side: "over" | "under"; prob: number; }
 
@@ -23,7 +25,8 @@ export default function PickemPage() {
   const [matchFilter, setMatchFilter] = useState("all");
   const [lines, setLines] = useState<Record<string, number>>({}); // key -> overridden line
   const [slip, setSlip] = useState<Leg[]>([]);
-  const [posted, setPosted] = useState<Map<string, number>>(new Map()); // key -> Dabble line
+  // Dabble posted lines, indexed by full name (and a collision-safe initial+surname fallback)
+  const [posted, setPosted] = useState<{ full: Map<string, number>; key: Map<string, number | null> }>({ full: new Map(), key: new Map() });
   const [havePosted, setHavePosted] = useState(false);
   const [mode, setMode] = useState<"dabble" | "manual">("dabble"); // auto-fill from Dabble vs all players
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "conf", dir: -1 });
@@ -33,13 +36,36 @@ export default function PickemPage() {
     loadProjections().then(setProj).catch(() => setErr("Projections feed not built."));
     loadPickem().then((pk) => {
       if (!pk?.lines?.length) { setMode("manual"); return; } // no Dabble lines yet → manual
-      const m = new Map<string, number>();
-      for (const l of pk.lines) m.set(`${playerKey(l.player)}|${l.market}`, l.line);
-      setPosted(m); setHavePosted(true);
+      const full = new Map<string, number>();
+      const key = new Map<string, number | null>();          // null = two different players share this key
+      const owner = new Map<string, string>();
+      for (const l of pk.lines) {
+        const nm = normName(l.player);
+        full.set(`${nm}|${l.market}`, l.line);
+        const kk = `${playerKey(l.player)}|${l.market}`;
+        if (owner.has(kk) && owner.get(kk) !== nm) key.set(kk, null);
+        else { owner.set(kk, nm); if (!key.has(kk)) key.set(kk, l.line); }
+      }
+      setPosted({ full, key }); setHavePosted(true);
     });
   }, []);
 
   const matches = useMemo(() => proj?.matches.map((m) => `${m.home_team} v ${m.away_team}`) ?? [], [proj]);
+
+  // how many projected players share each initial+surname key — gates the fuzzy fallback
+  const keyCount = useMemo(() => {
+    const m = new Map<string, number>();
+    proj?.matches.forEach((mt) => mt.players.forEach((p) => m.set(playerKey(p.player), (m.get(playerKey(p.player)) ?? 0) + 1)));
+    return m;
+  }, [proj]);
+
+  const postedLineFor = (player: string, mkt: string): number | null => {
+    const byFull = posted.full.get(`${normName(player)}|${mkt}`);
+    if (byFull != null) return byFull;
+    const fromKey = posted.key.get(`${playerKey(player)}|${mkt}`);
+    if (fromKey != null && keyCount.get(playerKey(player)) === 1) return fromKey; // unambiguous only
+    return null;
+  };
 
   const rows = useMemo(() => {
     if (!proj) return [];
@@ -52,7 +78,7 @@ export default function PickemPage() {
         if (!d || d.mean < 1) continue;
         if (q && !p.player.toLowerCase().includes(q.toLowerCase())) continue;
         const key = `${playerKey(p.player)}|${market}`;
-        const postedLine = posted.get(key);
+        const postedLine = postedLineFor(p.player, market);
         // Dabble mode: only the lines Dabble actually posted (auto-filled board)
         if (mode === "dabble" && havePosted && postedLine == null && lines[key] == null) continue;
         const line = lines[key] ?? postedLine ?? Math.max(0.5, Math.round(d.mean) - 0.5);
@@ -72,16 +98,18 @@ export default function PickemPage() {
       return (va - (vb as number)) * sort.dir;
     });
     return out;
-  }, [proj, market, matchFilter, lines, posted, mode, havePosted, sort, q]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proj, market, matchFilter, lines, posted, keyCount, mode, havePosted, sort, q]);
 
   const dabbleCount = useMemo(() => {
     if (!proj || !havePosted) return 0;
     let n = 0;
     for (const mt of proj.matches)
       for (const p of mt.players)
-        if (posted.has(`${playerKey(p.player)}|${market}`)) n++;
+        if (postedLineFor(p.player, market) != null) n++;
     return n;
-  }, [proj, posted, market, havePosted]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proj, posted, keyCount, market, havePosted]);
 
   const sortBy = (key: string) =>
     setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) as 1 | -1 : (key === "player" ? 1 : -1) }));
@@ -207,9 +235,11 @@ export default function PickemPage() {
                 ))}
               </div>
               <div className="shrink-0 text-right text-xs">
-                <div className="text-slate-400">{slip.length} legs · ×{mult || "—"}</div>
-                <div className={"font-bold " + (evVal > 0 ? "text-grass" : "text-slate-300")}>
-                  {(combined * 100).toFixed(1)}% · EV {mult ? `${evVal > 0 ? "+" : ""}${(evVal * 100).toFixed(0)}%` : "need 2+"}
+                <div className="text-slate-400">{slip.length} legs · ×{mult || "—"} · model {(combined * 100).toFixed(1)}%</div>
+                <div className={"font-bold " + (mult ? (evVal > 0 ? "text-grass" : "text-hot") : "text-slate-300")}>
+                  {mult
+                    ? (evVal > 0 ? `✅ Edge +${(evVal * 100).toFixed(0)}%` : `❌ No edge ${(evVal * 100).toFixed(0)}%`)
+                    : "add 2+ legs"}
                 </div>
               </div>
               <button onClick={() => setSlip([])} className="shrink-0 rounded-md bg-card px-2 py-1 text-xs text-slate-400">Clear</button>
