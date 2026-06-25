@@ -6,6 +6,7 @@ const TABS: [string, string][] = [
   ["Projections", "/projections"],
   ["Lineups", "/lineups"],
   ["Compare odds", "/compare"],
+  ["Over / Unders", "/overunders"],
   ["Pick’em", "/pickem"],
   ["Value", "/value"],
   ["Model Lab", "/lab"],

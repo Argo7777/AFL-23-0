@@ -32,6 +32,7 @@ export default function ComparePage() {
   const [kFrac, setKFrac] = useState(0.25);
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "ev", dir: -1 });
   const [q, setQ] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadProjections().then(setProj).catch(() => setErr("Projections feed not built."));
@@ -70,30 +71,41 @@ export default function ComparePage() {
       if (!hit) continue;
       if (matchFilter !== "all" && hit.match !== matchFilter) continue;
       if (q && !hit.p.player.toLowerCase().includes(q.toLowerCase())) continue;
-      const key = `${playerKey(r.player)}|${r.line}`;
+      const pk = playerKey(r.player);
+      const key = `${pk}|${r.line}`;
       let g = groups.get(key);
       if (!g) {
-        g = { player: hit.p.player, match: hit.match, line: r.line, proj: hit.p.dist[market].mean,
+        g = { pkey: pk, player: hit.p.player, match: hit.match, line: r.line, proj: hit.p.dist[market].mean,
           prices: {}, modelP: probOver(hit.p.dist[market], r.line) };
         groups.set(key, g);
       }
       g.prices[r.book] = Math.max(g.prices[r.book] ?? 0, r.price);
     }
-    const out = [...groups.values()].map((g) => {
+    // price each line-row
+    const lineRows = [...groups.values()].map((g) => {
       let bestBook = "", best = 0;
       for (const [b, p] of Object.entries(g.prices)) if (p > best) { best = p; bestBook = b; }
       return { ...g, bestBook, best, fair: fairOdds(g.modelP), edge: (g.modelP - impliedProb(best)) * 100,
         evVal: ev(g.modelP, best), stake: recommendedStake(g.modelP, best, bankroll, kFrac) };
     });
-    const filtered = out.filter((g) => (posOnly ? g.evVal > 0 : true));
-    const val = (g: typeof out[number]): number | string =>
+    // collapse: one entry per player; "best" = its top-EV line, keep all lines for expand
+    const byPlayer = new Map<string, typeof lineRows>();
+    for (const r of lineRows) (byPlayer.get(r.pkey) ?? byPlayer.set(r.pkey, []).get(r.pkey)!).push(r);
+    type Line = typeof lineRows[number];
+    const out = [...byPlayer.values()].map((lines) => {
+      lines.sort((a, b) => a.line - b.line);
+      const best = lines.reduce((a, b) => (b.evVal > a.evVal ? b : a));
+      return { best, lines };
+    });
+    const filtered = out.filter((g) => (posOnly ? g.best.evVal > 0 : true));
+    const val = (g: Line): number | string =>
       sort.key === "player" ? g.player
       : sort.key === "proj" ? g.proj : sort.key === "line" ? g.line
       : sort.key === "model" ? g.modelP : sort.key === "fair" ? g.fair
       : sort.key === "edge" ? g.edge : sort.key === "stake" ? g.stake
       : sort.key === "ev" ? g.evVal : (g.prices[sort.key] ?? -1); // book column
     filtered.sort((a, b) => {
-      const va = val(a), vb = val(b);
+      const va = val(a.best), vb = val(b.best);
       if (typeof va === "string") return va.localeCompare(vb as string) * sort.dir;
       return (va - (vb as number)) * sort.dir;
     });
@@ -102,12 +114,37 @@ export default function ComparePage() {
 
   const sortBy = (key: string) =>
     setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) as 1 | -1 : (key === "player" || key === "line" ? 1 : -1) }));
+  const toggleExp = (pk: string) =>
+    setExpanded((prev) => { const n = new Set(prev); n.has(pk) ? n.delete(pk) : n.add(pk); return n; });
 
   const toggleBook = (b: string) =>
     setHidden((prev) => { const n = new Set(prev); n.has(b) ? n.delete(b) : n.add(b); return n; });
 
   if (err) return <Shell><p className="text-hot">{err}</p></Shell>;
   if (!proj || !odds) return <Shell><p className="text-slate-400">Loading…</p></Shell>;
+
+  // the proj→stake cells, shared by the summary row and the expanded alt-lines
+  const cells = (r: typeof rows[number]["best"]) => {
+    const pos = r.evVal > 0;
+    return (
+      <>
+        <td className="border-t border-line/40 px-2 py-2 text-right font-semibold text-ice">{r.proj.toFixed(1)}</td>
+        <td className="border-t border-line/40 px-2 py-2 text-right text-slate-300">{r.line}+</td>
+        <td className="border-t border-line/40 px-2 py-2 text-right text-slate-400">{(r.modelP * 100).toFixed(0)}%</td>
+        <td className="border-t border-line/40 px-2 py-2 text-right text-slate-300">{r.fair.toFixed(2)}</td>
+        {books.map((b) => {
+          const p = r.prices[b]; const isBest = b === r.bestBook && !!p;
+          return <td key={b} className={"border-t border-line/40 px-2 py-2 text-right " +
+            (isBest ? "font-bold text-grass" : p ? "text-slate-200" : "text-slate-600")}>{p ? p.toFixed(2) : "–"}</td>;
+        })}
+        <td className={"border-t border-line/40 px-2 py-2 text-right font-bold " + (pos ? "text-grass" : "text-slate-400")}>
+          {r.evVal > 0 ? "+" : ""}{(r.evVal * 100).toFixed(0)}%
+          {r.evVal > 0.15 && <span title="Large edge — usually a late lineup change or a soft/mismatched line, not free money." className="ml-0.5 text-gold">⚠</span>}
+        </td>
+        <td className="border-t border-line/40 px-2 py-2 text-right font-bold text-gold">{r.stake > 0 ? `$${r.stake.toFixed(0)}` : "–"}</td>
+      </>
+    );
+  };
 
   return (
     <Shell>
@@ -178,35 +215,36 @@ export default function ComparePage() {
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, 250).map((g, i) => {
-              const pos = g.evVal > 0;
-              return (
-                <tr key={i} className={pos ? "bg-grass/5" : ""}>
-                  <td className={"sticky left-0 z-10 border-t border-line/40 px-2 py-2 " + (pos ? "bg-[#10331f]" : "bg-pitch")}>
-                    <div className="font-semibold leading-tight">{g.player}</div>
-                    <div className="text-[11px] leading-tight text-slate-500">{g.match}</div>
-                  </td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right font-semibold text-ice">{g.proj.toFixed(1)}</td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right text-slate-300">{g.line}+</td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right text-slate-400">{(g.modelP * 100).toFixed(0)}%</td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right text-slate-300">{g.fair.toFixed(2)}</td>
-                  {books.map((b) => {
-                    const p = g.prices[b];
-                    const isBest = b === g.bestBook && !!p;
-                    return (
-                      <td key={b} className={"border-t border-line/40 px-2 py-2 text-right " +
-                        (isBest ? "font-bold text-grass" : p ? "text-slate-200" : "text-slate-600")}>
-                        {p ? p.toFixed(2) : "–"}
-                      </td>
-                    );
-                  })}
-                  <td className={"border-t border-line/40 px-2 py-2 text-right font-bold " + (pos ? "text-grass" : "text-slate-400")}>
-                    {g.evVal > 0 ? "+" : ""}{(g.evVal * 100).toFixed(0)}%
-                    {g.evVal > 0.15 && <span title="Large edge — usually a late lineup change or a soft/mismatched line, not free money. Check the player is named." className="ml-0.5 text-gold">⚠</span>}
-                  </td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right font-bold text-gold">{g.stake > 0 ? `$${g.stake.toFixed(0)}` : "–"}</td>
-                </tr>
-              );
+            {rows.slice(0, 250).flatMap((g) => {
+              const open = expanded.has(g.best.pkey);
+              const list = [g.best, ...(open ? g.lines.filter((l) => l !== g.best) : [])];
+              const multi = g.lines.length > 1;
+              return list.map((r, idx) => {
+                const summary = idx === 0;
+                const pos = r.evVal > 0;
+                return (
+                  <tr key={`${g.best.pkey}-${r.line}-${summary ? "s" : "l"}`} className={pos ? "bg-grass/5" : ""}>
+                    <td className={"sticky left-0 z-10 border-t border-line/40 px-2 py-2 " + (pos ? "bg-[#10331f]" : "bg-pitch")}>
+                      {summary ? (
+                        <div className="flex items-start gap-1">
+                          <button onClick={() => multi && toggleExp(g.best.pkey)}
+                            className={"mt-0.5 w-3 shrink-0 text-slate-500 " + (multi ? "hover:text-slate-200" : "opacity-0")}>
+                            {open ? "▾" : "▸"}
+                          </button>
+                          <div>
+                            <div className="font-semibold leading-tight">{r.player}
+                              {multi && <span className="ml-1 text-[11px] font-normal text-slate-500">{g.lines.length} lines</span>}</div>
+                            <div className="text-[11px] leading-tight text-slate-500">{r.match}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="block pl-4 text-xs text-slate-600">↳ alt line</span>
+                      )}
+                    </td>
+                    {cells(r)}
+                  </tr>
+                );
+              });
             })}
           </tbody>
         </table>
@@ -216,13 +254,13 @@ export default function ComparePage() {
         <p className="py-6 text-center text-sm text-slate-500">No {posOnly ? "+EV " : ""}lines for this filter.</p>
       )}
       <p className="mt-3 text-xs text-slate-500">
-        Tap any column header to sort. <b className="text-ice">Proj</b> is the model’s projected
-        {" "}{MARKETS.find(([k]) => k === market)?.[1].toLowerCase()}; <b>My $</b> is the model’s fair
-        price for that line; best book price is <span className="text-grass">green</span>. EV &amp;
-        Stake use the best price ({kFrac === 1 ? "full" : kFrac === 0.5 ? "half" : "quarter"}-Kelly,
-        ${bankroll.toLocaleString()} bankroll, full Kelly clamped to 20%). Most lines are −EV (the bookmaker’s margin);
-        only a minority show value, and large edges (⚠) are usually late lineup changes or a soft line
-        rather than free money. {rows.length.toLocaleString()} lines (top 250). Odds {new Date(odds.generated).toLocaleString()}.
+        One row per player showing their <b>best-value line</b> — tap <b className="text-slate-300">▸</b> to
+        see every alternate line. Tap a column header to sort. <b className="text-ice">Proj</b> is the model’s
+        projection; <b>My $</b> its fair price; best book price is <span className="text-grass">green</span>.
+        EV &amp; Stake use the best price ({kFrac === 1 ? "full" : kFrac === 0.5 ? "half" : "quarter"}-Kelly,
+        ${bankroll.toLocaleString()} bankroll, full Kelly clamped to 20%). Big edges (⚠) usually mean a late
+        lineup change or a soft line, not free money. {rows.length.toLocaleString()} players (top 250).
+        Odds {new Date(odds.generated).toLocaleString()}.
       </p>
       <Disclaimer />
     </Shell>
