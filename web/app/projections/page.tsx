@@ -6,13 +6,13 @@ import {
   loadProjections, MARKETS, playerKey, type Market,
   type ProjectionsOutput, type MatchProjection,
 } from "@/lib/modeldb";
-import { loadSuperCoach, scIndex, type ScPlayer } from "@/lib/supercoach";
+import { loadSuperCoach, scIndex, money, type ScPlayer } from "@/lib/supercoach";
 
 export default function ProjectionsPage() {
   const [data, setData] = useState<ProjectionsOutput | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [mi, setMi] = useState(0);
-  const [market, setMarket] = useState<Market>("disposals");
+  const [market, setMarket] = useState<Market | "supercoach">("disposals");
   const [q, setQ] = useState("");
   const [sc, setSc] = useState<Map<string, ScPlayer>>(new Map());
 
@@ -61,9 +61,20 @@ export default function ProjectionsPage() {
             {label}
           </button>
         ))}
+        <button
+          onClick={() => setMarket("supercoach")}
+          className={
+            "rounded-md px-2.5 py-1 text-xs font-bold transition " +
+            (market === "supercoach" ? "bg-gold text-pitch" : "bg-pitch-light text-gold hover:text-gold")
+          }
+        >
+          SuperCoach
+        </button>
       </div>
 
-      <PlayerTable m={m} market={market} q={q} sc={sc} />
+      {market === "supercoach"
+        ? <ScMatchTable m={m} q={q} sc={sc} />
+        : <PlayerTable m={m} market={market as Market} q={q} sc={sc} />}
       <p className="mt-4 text-xs text-slate-500">
         Mean / median / spread come from {data.n_sims.toLocaleString()} Monte-Carlo sims per match.
         “Model” is the direct regressor expectation. Lines show P(over). “SC” is SuperCoach’s projected
@@ -175,6 +186,55 @@ function PlayerTable({ m, market, q, sc }: { m: MatchProjection; market: Market;
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** SuperCoach view of a match — each side's players with SC price/projection/form. */
+function ScMatchTable({ m, q, sc }: { m: MatchProjection; q: string; sc: Map<string, ScPlayer> }) {
+  const rows = useMemo(
+    () => m.players
+      .filter((p) => !q || p.player.toLowerCase().includes(q.toLowerCase()))
+      .map((p) => ({ p, scp: sc.get(playerKey(p.player)) }))
+      .filter((r) => r.scp)
+      .sort((a, b) => (b.scp!.proj || b.scp!.avg) - (a.scp!.proj || a.scp!.avg)),
+    [m, q, sc],
+  );
+  if (!sc.size) return <p className="text-sm text-slate-500">Loading SuperCoach data…</p>;
+  return (
+    <div className="overflow-x-auto rounded-xl border border-line">
+      <table className="w-full text-sm">
+        <thead className="bg-pitch-light text-xs uppercase text-slate-400">
+          <tr>
+            <th className="px-3 py-2 text-left">Player</th>
+            <th className="px-2 py-2 text-left">Pos</th>
+            <th className="px-2 py-2 text-right">Price</th>
+            <th className="px-2 py-2 text-right text-gold">Proj</th>
+            <th className="px-2 py-2 text-right">Avg</th>
+            <th className="px-2 py-2 text-right">L3</th>
+            <th className="px-2 py-2 text-right">Own%</th>
+            <th className="px-2 py-2 text-right">v Opp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ p, scp }) => (
+            <tr key={p.player_id} className="border-t border-line/50 hover:bg-card-hover/40">
+              <td className="px-3 py-1.5">
+                <span className="font-semibold">{p.player}</span>
+                <span className="ml-1.5 text-xs text-slate-500">{p.is_home ? m.home_team : m.away_team}</span>
+              </td>
+              <td className="px-2 py-1.5 text-left text-[11px] font-black uppercase text-slate-300">{scp!.positions.join("/")}</td>
+              <td className="px-2 py-1.5 text-right text-slate-300">{money(scp!.price)}</td>
+              <td className="px-2 py-1.5 text-right font-bold text-gold">{scp!.proj ? Math.round(scp!.proj) : "—"}</td>
+              <td className="px-2 py-1.5 text-right">{scp!.avg || "—"}</td>
+              <td className="px-2 py-1.5 text-right text-slate-400">{scp!.avg3 || "—"}</td>
+              <td className="px-2 py-1.5 text-right text-slate-400">{scp!.owned ? scp!.owned + "%" : "—"}</td>
+              <td className="px-2 py-1.5 text-right text-slate-400" title={scp!.opp ? `${scp!.oppHome ? "vs" : "@"} ${scp!.opp}` : ""}>{scp!.oppAvg || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!rows.length && <p className="px-3 py-6 text-center text-sm text-slate-500">No SuperCoach matches found for these players.</p>}
     </div>
   );
 }

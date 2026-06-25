@@ -34,6 +34,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/supercoach/ownership/`, changeFrequency: "daily", priority: 0.6 },
     { url: `${base}/supercoach/injuries/`, changeFrequency: "daily", priority: 0.6 },
     { url: `${base}/supercoach/fixtures/`, changeFrequency: "daily", priority: 0.6 },
+    { url: `${base}/supercoach/model/`, changeFrequency: "daily", priority: 0.6 },
     { url: `${base}/supercoach/how-it-works/`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/aflw/`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${base}/aflw/ladder/`, changeFrequency: "weekly", priority: 0.7 },

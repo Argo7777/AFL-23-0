@@ -11,6 +11,7 @@ const TABS: [string, string][] = [
   ["Ownership", "/supercoach/ownership"],
   ["Injuries", "/supercoach/injuries"],
   ["Fixtures", "/supercoach/fixtures"],
+  ["Model vs SC", "/supercoach/model"],
   ["How it works", "/supercoach/how-it-works"],
 ];
 
