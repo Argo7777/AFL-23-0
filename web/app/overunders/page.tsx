@@ -7,16 +7,18 @@ import {
   loadProjections, MARKETS, probOver, playerKey,
   type Market, type ProjectionsOutput, type PlayerProjection,
 } from "@/lib/modeldb";
-import { fairOdds, ev } from "@/lib/staking";
+import { fairOdds, ev, devigTwoWay } from "@/lib/staking";
 import { BASE_PATH } from "@/lib/game/data";
 
-interface OddsRow { book: string; market: string; player: string; line: number; price: number }
-const BOOK_LABEL: Record<string, string> = { sportsbet: "Sportsbet", tab: "TAB", ladbrokes: "Ladbrokes", dabble: "Dabble" };
+interface OuRow { book: string; market: string; player: string; line: number; over: number; under: number }
+const BOOK_LABEL: Record<string, string> = { sportsbet: "Sportsbet", tab: "TAB", ladbrokes: "Ladbrokes" };
 
-/** Clean one-line-per-player over/under board: the main line, model over/under, best over price. */
+/** Real two-way over/under board: only players the bookmakers actually price, with
+ *  both book prices, the de-vigged market, the model's read, and the value side. */
 export default function OverUndersPage() {
   const [proj, setProj] = useState<ProjectionsOutput | null>(null);
-  const [oddsRows, setOddsRows] = useState<OddsRow[]>([]);
+  const [ou, setOu] = useState<OuRow[]>([]);
+  const [books, setBooks] = useState<string[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [market, setMarket] = useState<Market>("disposals");
   const [matchFilter, setMatchFilter] = useState("all");
@@ -25,57 +27,59 @@ export default function OverUndersPage() {
 
   useEffect(() => {
     loadProjections().then(setProj).catch(() => setErr("Projections feed not built."));
-    fetch(`${BASE_PATH}/data/odds-latest.json`).then((r) => r.ok ? r.json() : null)
-      .then((d) => setOddsRows(d?.rows ?? [])).catch(() => {});
+    fetch(`${BASE_PATH}/data/ou-latest.json`).then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) { setOu(d.rows ?? []); setBooks(d.books ?? []); } }).catch(() => {});
   }, []);
 
-  // best over price (+book) per playerKey|market -> line
-  const book = useMemo(() => {
-    const m = new Map<string, Map<number, { price: number; book: string }>>();
-    for (const r of oddsRows) {
+  // best over / best under (and book) per playerKey|market|line
+  const byPlayer = useMemo(() => {
+    const m = new Map<string, { line: number; over: number; overBook: string; under: number; underBook: string }>();
+    for (const r of ou) {
       if (r.market !== market) continue;
       const k = playerKey(r.player);
-      let lm = m.get(k); if (!lm) m.set(k, (lm = new Map()));
-      const cur = lm.get(r.line);
-      if (!cur || r.price > cur.price) lm.set(r.line, { price: r.price, book: r.book });
+      const cur = m.get(k);
+      if (!cur) m.set(k, { line: r.line, over: r.over, overBook: r.book, under: r.under, underBook: r.book });
+      else {
+        if (r.over > cur.over) { cur.over = r.over; cur.overBook = r.book; }
+        if (r.under > cur.under) { cur.under = r.under; cur.underBook = r.book; }
+      }
     }
     return m;
-  }, [oddsRows, market]);
+  }, [ou, market]);
 
   const matches = useMemo(() => proj?.matches.map((m) => `${m.home_team} v ${m.away_team}`) ?? [], [proj]);
 
   const rows = useMemo(() => {
     if (!proj) return [];
+    const idx = new Map<string, { p: PlayerProjection; match: string }>();
+    proj.matches.forEach((mt) => mt.players.forEach((p) => idx.set(playerKey(p.player), { p, match: `${mt.home_team} v ${mt.away_team}` })));
     const out: Array<{
-      p: PlayerProjection; match: string; proj: number; line: number; over: number; under: number;
-      bestOver: number | undefined; bestBook: string | undefined; lean: string; edge: number; evOver: number;
+      p: PlayerProjection; match: string; line: number; proj: number; over: number; under: number;
+      overP: number; underP: number; overBook: string; underBook: string; mOver: number; mUnder: number;
+      evOver: number; evUnder: number; bestEv: number; side: "Over" | "Under"; bestPrice: number; bestBook: string;
     }> = [];
-    for (const mt of proj.matches) {
-      const match = `${mt.home_team} v ${mt.away_team}`;
-      if (matchFilter !== "all" && match !== matchFilter) continue;
-      for (const p of mt.players as PlayerProjection[]) {
-        const d = p.dist[market];
-        if (!d || d.mean < 1) continue;
-        if (q && !p.player.toLowerCase().includes(q.toLowerCase())) continue;
-        const lines = book.get(playerKey(p.player));
-        // only players the bookmakers actually price (real over/under markets)
-        if (!lines || !lines.size) continue;
-        // main line = book line nearest the projection
-        const line = [...lines.keys()].reduce((b, l) => Math.abs(l - d.mean) < Math.abs(b - d.mean) ? l : b, [...lines.keys()][0]);
-        const over = probOver(d, line);
-        const auto = lines?.get(line);
-        const evOver = auto ? ev(over, auto.price) : NaN;
-        out.push({ p, match, proj: d.mean, line, over, under: 1 - over,
-          bestOver: auto?.price, bestBook: auto?.book,
-          lean: over >= 0.5 ? "Over" : "Under", edge: Number.isFinite(evOver) ? evOver : -9, evOver });
-      }
+    for (const [k, b] of byPlayer) {
+      const hit = idx.get(k); if (!hit) continue;
+      if (matchFilter !== "all" && hit.match !== matchFilter) continue;
+      if (q && !hit.p.player.toLowerCase().includes(q.toLowerCase())) continue;
+      const d = hit.p.dist[market];
+      const mOver = probOver(d, b.line), mUnder = 1 - mOver;
+      const [marketOver, marketUnder] = devigTwoWay(b.over, b.under);
+      const evOver = ev(mOver, b.over), evUnder = ev(mUnder, b.under);
+      const side = evOver >= evUnder ? "Over" : "Under";
+      out.push({
+        p: hit.p, match: hit.match, line: b.line, proj: d.mean, over: marketOver, under: marketUnder,
+        overP: b.over, underP: b.under, overBook: b.overBook, underBook: b.underBook, mOver, mUnder,
+        evOver, evUnder, bestEv: Math.max(evOver, evUnder), side,
+        bestPrice: side === "Over" ? b.over : b.under, bestBook: side === "Over" ? b.overBook : b.underBook,
+      });
     }
     const val = (r: typeof out[number]): number | string =>
       sort.key === "player" ? r.p.player : sort.key === "proj" ? r.proj : sort.key === "line" ? r.line
-      : sort.key === "over" ? r.over : sort.key === "edge" ? r.edge : r.proj;
-    out.sort((a, b) => { const va = val(a), vb = val(b); return typeof va === "string" ? va.localeCompare(vb as string) * sort.dir : (va - (vb as number)) * sort.dir; });
+      : sort.key === "over" ? r.mOver : sort.key === "edge" ? r.bestEv : r.bestEv;
+    out.sort((a, b2) => { const va = val(a), vb = val(b2); return typeof va === "string" ? va.localeCompare(vb as string) * sort.dir : (va - (vb as number)) * sort.dir; });
     return out;
-  }, [proj, market, matchFilter, q, book, sort]);
+  }, [proj, byPlayer, market, matchFilter, q, sort]);
 
   const sortBy = (key: string) => setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) as 1 | -1 : (key === "player" ? 1 : -1) }));
 
@@ -101,63 +105,69 @@ export default function OverUndersPage() {
         ))}
       </div>
 
-      <div className="-mx-3 overflow-x-auto px-3 [-webkit-overflow-scrolling:touch]">
-        <table className="w-full min-w-[34rem] border-separate border-spacing-0 text-sm">
-          <thead className="text-xs uppercase text-slate-400">
-            <tr>
-              <Th k="player" label="Player" align="left" sticky sort={sort} onSort={sortBy} />
-              <Th k="proj" label="Proj" sort={sort} onSort={sortBy} />
-              <Th k="line" label="Line" sort={sort} onSort={sortBy} />
-              <th className="bg-pitch px-2 py-2 text-center">Over / Under</th>
-              <Th k="over" label="Over %" sort={sort} onSort={sortBy} />
-              <th className="bg-pitch px-2 py-2 text-right">Best Over</th>
-              <Th k="edge" label="Lean" sort={sort} onSort={sortBy} />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.slice(0, 300).map((r, i) => {
-              const overPct = Math.round(r.over * 100);
-              const leanOver = r.lean === "Over";
-              return (
-                <tr key={i}>
-                  <td className="sticky left-0 z-10 border-t border-line/40 bg-pitch px-2 py-2">
-                    <div className="font-semibold leading-tight">{r.p.player}</div>
-                    <div className="text-[11px] leading-tight text-slate-500">{r.match}</div>
-                  </td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right font-semibold text-ice">{r.proj.toFixed(1)}</td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right text-slate-300">{r.line}</td>
-                  <td className="border-t border-line/40 px-2 py-2">
-                    <div className="mx-auto h-2 w-28 overflow-hidden rounded-full bg-hot/30">
-                      <div className="h-full bg-grass" style={{ width: `${overPct}%` }} />
-                    </div>
-                    <div className="mt-0.5 flex w-28 justify-between text-[10px] text-slate-500 mx-auto">
-                      <span className="text-grass">O {overPct}%</span><span className="text-hot">U {100 - overPct}%</span>
-                    </div>
-                  </td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right text-slate-300">
-                    {overPct}%<span className="ml-1 text-[11px] text-slate-600">{fairOdds(r.over).toFixed(2)}</span>
-                  </td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right">
-                    {r.bestOver ? <span className="font-bold text-grass">{r.bestOver.toFixed(2)}</span> : <span className="text-slate-600">–</span>}
-                    {r.bestBook && <span className="ml-1 text-[10px] text-slate-500">{BOOK_LABEL[r.bestBook]?.slice(0, 4)}</span>}
-                  </td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right">
-                    <span className={"rounded px-1.5 py-0.5 text-xs font-bold " + (leanOver ? "bg-grass/15 text-grass" : "bg-hot/15 text-hot")}>
-                      {r.lean} {Math.round(Math.max(r.over, r.under) * 100)}%
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-line bg-card p-6 text-center text-sm text-slate-400">
+          No two-way over/under markets posted for {MARKETS.find(([k]) => k === market)?.[1].toLowerCase()} yet —
+          bookmakers usually post these closer to game day. Books live: {books.map((b) => BOOK_LABEL[b] ?? b).join(", ") || "none"}.
+        </p>
+      ) : (
+        <div className="-mx-3 overflow-x-auto px-3 [-webkit-overflow-scrolling:touch]">
+          <table className="w-full min-w-[38rem] border-separate border-spacing-0 text-sm">
+            <thead className="text-xs uppercase text-slate-400">
+              <tr>
+                <Th k="player" label="Player" align="left" sticky sort={sort} onSort={sortBy} />
+                <Th k="proj" label="Proj" sort={sort} onSort={sortBy} />
+                <Th k="line" label="Line" sort={sort} onSort={sortBy} />
+                <th className="bg-pitch px-2 py-2 text-center">Model O/U</th>
+                <th className="bg-pitch px-2 py-2 text-right">Over $</th>
+                <th className="bg-pitch px-2 py-2 text-right">Under $</th>
+                <Th k="edge" label="Value" sort={sort} onSort={sortBy} />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 300).map((r, i) => {
+                const overPct = Math.round(r.mOver * 100);
+                const val = r.bestEv > 0;
+                return (
+                  <tr key={i} className={val ? "bg-grass/5" : ""}>
+                    <td className={"sticky left-0 z-10 border-t border-line/40 px-2 py-2 " + (val ? "bg-[#10331f]" : "bg-pitch")}>
+                      <div className="font-semibold leading-tight">{r.p.player}</div>
+                      <div className="text-[11px] leading-tight text-slate-500">{r.match}</div>
+                    </td>
+                    <td className="border-t border-line/40 px-2 py-2 text-right font-semibold text-ice">{r.proj.toFixed(1)}</td>
+                    <td className="border-t border-line/40 px-2 py-2 text-right text-slate-300">{r.line}</td>
+                    <td className="border-t border-line/40 px-2 py-2">
+                      <div className="mx-auto h-2 w-24 overflow-hidden rounded-full bg-hot/30">
+                        <div className="h-full bg-grass" style={{ width: `${overPct}%` }} />
+                      </div>
+                      <div className="mx-auto mt-0.5 flex w-24 justify-between text-[10px]">
+                        <span className="text-grass">O {overPct}%</span><span className="text-hot">U {100 - overPct}%</span>
+                      </div>
+                    </td>
+                    <td className={"border-t border-line/40 px-2 py-2 text-right " + (r.side === "Over" && val ? "font-bold text-grass" : "text-slate-200")}>
+                      {r.overP.toFixed(2)}<span className="ml-1 text-[10px] text-slate-600">{fairOdds(r.mOver).toFixed(2)}</span>
+                    </td>
+                    <td className={"border-t border-line/40 px-2 py-2 text-right " + (r.side === "Under" && val ? "font-bold text-grass" : "text-slate-200")}>
+                      {r.underP.toFixed(2)}<span className="ml-1 text-[10px] text-slate-600">{fairOdds(r.mUnder).toFixed(2)}</span>
+                    </td>
+                    <td className="border-t border-line/40 px-2 py-2 text-right">
+                      {val
+                        ? <span className="rounded bg-grass/15 px-1.5 py-0.5 text-xs font-bold text-grass">{r.side} +{(r.bestEv * 100).toFixed(0)}%</span>
+                        : <span className="text-slate-600">–</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       <p className="mt-3 text-xs text-slate-500">
-        One line per player — the main line nearest the projection. The bar shows the model’s
-        <span className="text-grass"> Over</span> vs <span className="text-hot">Under</span> probability;
-        <b> Best Over</b> is the top book price (green when it beats the model’s fair price). For every
-        alternate line across the bookmakers side by side, see <b>Compare odds</b>. Only players the
-        bookmakers actually price are shown (Dabble Pick’em lives on the <b>Pick’em</b> page).
+        Real two-way bookmaker over/under markets (a single main line, both prices). The bar is the
+        model’s <span className="text-grass">Over</span>/<span className="text-hot">Under</span> probability;
+        small grey figures are the model’s fair price each side. <b className="text-grass">Value</b> flags the
+        side the model rates +EV vs the book’s de-vigged price. Sportsbet posts first; TAB, Ladbrokes and
+        Dabble add theirs closer to game day. For the full alt-line ladder see <b>Compare odds</b>.
       </p>
       <Disclaimer />
     </Shell>
@@ -182,7 +192,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-5xl px-3 py-5">
       <h1 className="font-display mb-1 text-2xl font-black text-grass">Over / Unders</h1>
-      <p className="mb-4 text-sm text-slate-400">The model’s over/under read on every player’s main line — one row each.</p>
+      <p className="mb-4 text-sm text-slate-400">Real two-way bookmaker over/under lines, with the model’s read and the value side.</p>
       <ModelNav />
       {children}
     </main>

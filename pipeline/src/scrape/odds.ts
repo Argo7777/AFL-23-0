@@ -41,6 +41,12 @@ export interface OddsRow {
   market: string; player: string; line: number; price: number;
 }
 
+// True two-way over/under markets (a single main line with both Over and Under
+// prices, e.g. "Lachie Neale - Disposals" Over/Under 28.5). Their own feed →
+// the Over/Unders page. Sportsbet posts these now; TAB/Ladbrokes/Dabble later.
+export interface OuRow { book: string; event: string; market: string; player: string; line: number; over: number; under: number; }
+const ouRows: OuRow[] = [];
+
 // Dabble Pick'em (flat-multiplier parlay) lines — not priced odds, so they go to
 // their own feed; the model judges the line on the Pick'em page.
 export interface PickemLine { player: string; event: string; market: string; line: number; }
@@ -70,6 +76,8 @@ const SB = "https://www.sportsbet.com.au/apigw/sportsbook-sports/Sportsbook/Spor
 const SB_HDR = { "User-Agent": "Mozilla/5.0", Accept: "application/json" };
 const SB_AFL = 4165;
 const SB_THRESHOLD = new RegExp(`^(\\d+)\\+ (${STAT_ALT})$`);
+// two-way O/U market: "Lachie Neale - Disposals" (line in selection.unformattedHandicap)
+const SB_OU = new RegExp(`^(.+?) - (${STAT_ALT})$`);
 
 async function fetchSportsbet(): Promise<OddsRow[]> {
   const comp = await getJson<{ events?: any[] }>(
@@ -80,22 +88,41 @@ async function fetchSportsbet(): Promise<OddsRow[]> {
     const markets = await getJson<any[]>(`${SB}/Events/${ev.id}/Markets`, SB_HDR);
     if (!Array.isArray(markets)) continue;
     for (const m of markets) {
-      const mm = SB_THRESHOLD.exec(m.name || "");
-      if (!mm) continue;
-      const market = STAT_MAP[mm[2]];
-      if (!market) continue;
-      const line = Number(mm[1]) - 0.5;
-      for (const s of m.selections ?? []) {
-        const price = s.price?.winPrice;
-        if (price && s.name) rows.push({
-          book: "sportsbet", event: ev.name, home: ev.participant1, away: ev.participant2,
-          start_iso: isoEpoch(ev.startTime), market, player: s.name.trim(), line, price,
+      const name = m.name || "";
+      const mm = SB_THRESHOLD.exec(name);
+      if (mm) {
+        const market = STAT_MAP[mm[2]];
+        if (!market) continue;
+        const line = Number(mm[1]) - 0.5;
+        for (const s of m.selections ?? []) {
+          const price = s.price?.winPrice;
+          if (price && s.name) rows.push({
+            book: "sportsbet", event: ev.name, home: ev.participant1, away: ev.participant2,
+            start_iso: isoEpoch(ev.startTime), market, player: s.name.trim(), line, price,
+          });
+        }
+        continue;
+      }
+      // two-way over/under: "<Player> - <Stat>", Over/Under selections w/ a line
+      const ou = SB_OU.exec(name);
+      if (ou && (m.selections?.length ?? 0) === 2) {
+        const market = STAT_MAP[ou[2]];
+        if (!market) continue;
+        let over = 0, under = 0, line = 0;
+        for (const s of m.selections) {
+          const p = s.price?.winPrice; const hc = Number(s.unformattedHandicap);
+          if (!p) continue;
+          if (/\bover$/i.test(s.name || "")) { over = p; if (hc) line = hc; }
+          else if (/\bunder$/i.test(s.name || "")) { under = p; if (hc) line = hc; }
+        }
+        if (over && under && line) ouRows.push({
+          book: "sportsbet", event: ev.name, market, player: ou[1].trim(), line, over, under,
         });
       }
     }
     await sleep(250);
   }
-  console.log(`  [sportsbet] ${rows.length} rows`);
+  console.log(`  [sportsbet] ${rows.length} rows, ${ouRows.length} O/U`);
   return rows;
 }
 
@@ -309,6 +336,11 @@ export async function fetchOdds() {
   const PICKEM_OUT = join(dirname(OUT), "pickem-latest.json");
   writeFileSync(PICKEM_OUT, JSON.stringify({ generated, n: pickemLines.length, lines: pickemLines }));
   console.log(`Wrote ${PICKEM_OUT}: ${pickemLines.length} pick'em lines`);
+  // true two-way over/under markets → their own feed for the Over/Unders page
+  const OU_OUT = join(dirname(OUT), "ou-latest.json");
+  const ouBooks = [...new Set(ouRows.map((r) => r.book))];
+  writeFileSync(OU_OUT, JSON.stringify({ generated, books: ouBooks, n: ouRows.length, rows: ouRows }));
+  console.log(`Wrote ${OU_OUT}: ${ouRows.length} O/U lines from [${ouBooks.join(", ")}]`);
   return out;
 }
 
