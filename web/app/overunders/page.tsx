@@ -12,6 +12,7 @@ import { BASE_PATH } from "@/lib/game/data";
 
 interface OuRow { book: string; market: string; player: string; line: number; over: number; under: number }
 const BOOK_LABEL: Record<string, string> = { sportsbet: "Sportsbet", tab: "TAB", ladbrokes: "Ladbrokes" };
+const normName = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
 
 /** Real two-way over/under board: only players the bookmakers actually price, with
  *  both book prices, the de-vigged market, the model's read, and the value side. */
@@ -31,14 +32,15 @@ export default function OverUndersPage() {
       .then((d) => { if (d) { setOu(d.rows ?? []); setBooks(d.books ?? []); } }).catch(() => {});
   }, []);
 
-  // best over / best under (and book) per playerKey|market|line
+  // best over / best under (and book) per player, keyed by full name so two players
+  // who share a first-initial+surname (e.g. Joe vs Jarrod Berry) never get merged.
   const byPlayer = useMemo(() => {
-    const m = new Map<string, { line: number; over: number; overBook: string; under: number; underBook: string }>();
+    const m = new Map<string, { name: string; line: number; over: number; overBook: string; under: number; underBook: string }>();
     for (const r of ou) {
       if (r.market !== market) continue;
-      const k = playerKey(r.player);
+      const k = normName(r.player);
       const cur = m.get(k);
-      if (!cur) m.set(k, { line: r.line, over: r.over, overBook: r.book, under: r.under, underBook: r.book });
+      if (!cur) m.set(k, { name: r.player, line: r.line, over: r.over, overBook: r.book, under: r.under, underBook: r.book });
       else {
         if (r.over > cur.over) { cur.over = r.over; cur.overBook = r.book; }
         if (r.under > cur.under) { cur.under = r.under; cur.underBook = r.book; }
@@ -51,15 +53,27 @@ export default function OverUndersPage() {
 
   const rows = useMemo(() => {
     if (!proj) return [];
-    const idx = new Map<string, { p: PlayerProjection; match: string }>();
-    proj.matches.forEach((mt) => mt.players.forEach((p) => idx.set(playerKey(p.player), { p, match: `${mt.home_team} v ${mt.away_team}` })));
+    // Exact full-name index, plus a fuzzy first-initial+surname index that we only
+    // trust when the key is unambiguous (maps to a single projected player).
+    const byFull = new Map<string, { p: PlayerProjection; match: string }>();
+    const byKey = new Map<string, { p: PlayerProjection; match: string }>();
+    const keyCount = new Map<string, number>();
+    proj.matches.forEach((mt) => mt.players.forEach((p) => {
+      const entry = { p, match: `${mt.home_team} v ${mt.away_team}` };
+      byFull.set(normName(p.player), entry);
+      const k = playerKey(p.player);
+      byKey.set(k, entry);
+      keyCount.set(k, (keyCount.get(k) ?? 0) + 1);
+    }));
     const out: Array<{
       p: PlayerProjection; match: string; line: number; proj: number; over: number; under: number;
       overP: number; underP: number; overBook: string; underBook: string; mOver: number; mUnder: number;
       evOver: number; evUnder: number; bestEv: number; side: "Over" | "Under"; bestPrice: number; bestBook: string;
     }> = [];
-    for (const [k, b] of byPlayer) {
-      const hit = idx.get(k); if (!hit) continue;
+    for (const b of byPlayer.values()) {
+      let hit = byFull.get(normName(b.name));
+      if (!hit) { const pk = playerKey(b.name); if (keyCount.get(pk) === 1) hit = byKey.get(pk); }
+      if (!hit) continue;
       if (matchFilter !== "all" && hit.match !== matchFilter) continue;
       if (q && !hit.p.player.toLowerCase().includes(q.toLowerCase())) continue;
       const d = hit.p.dist[market];
