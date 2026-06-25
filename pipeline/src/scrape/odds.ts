@@ -50,9 +50,10 @@ const ouRows: OuRow[] = [];
 // Dabble Pick'em (flat-multiplier parlay) lines — not priced odds, so they go to
 // their own feed; the model judges the line on the Pick'em page.
 export interface PickemLine { player: string; event: string; market: string; line: number; }
-const PICKEM_STAT: Record<string, string> = {
+// Dabble resultingType suffix (odds_on_pickem_<suffix>) → our model market key
+const PICKEM_RT: Record<string, string> = {
   disposals: "disposals", goals: "goals", marks: "marks", tackles: "tackles",
-  kicks: "kicks", handballs: "handballs", "fantasy-points": "dreamTeamPoints",
+  fantasy: "dreamTeamPoints",
 };
 const pickemLines: PickemLine[] = [];
 
@@ -159,6 +160,8 @@ async function fetchDabble(): Promise<OddsRow[]> {
     for (const p of sfd.prices ?? []) {
       (priceByMkt[p.marketId] ??= []).push([selName[p.selectionId], p.price]);
     }
+    const rtById: Record<string, string> = {};
+    for (const m of sfd.markets ?? []) rtById[m.id] = (m.resultingType || "").toLowerCase();
     const name = fixture.name || sfd.name || "";
     const [home, away] = name.includes(" v ") ? name.split(" v ", 2) : [null, null];
     for (const m of sfd.markets ?? []) {
@@ -184,12 +187,18 @@ async function fetchDabble(): Promise<OddsRow[]> {
       });
       if (over && under) ouRows.push({ book: "dabble", event: name, market, player, line, over, under });
     }
-    // Pick'em product: one line per player+stat (over/under share a value)
+    // Pick'em product: ONLY the main full-game line per player+stat. Dabble bundles
+    // alt-line ("sportcast_to_get_30_plus_disposals") and period ("first_qtr"/
+    // "first_half") props into playerProps too — those produced bogus lines like
+    // Neale 39.5 disposals. The genuine pick'em line is resultingType
+    // "odds_on_pickem_<stat>" exactly (full game), so gate on that.
     const seen = new Set<string>();
     for (const pp of sfd.playerProps ?? []) {
-      const stat = PICKEM_STAT[String((pp.stats ?? [])[0] ?? "").toLowerCase()];
-      if (!stat || pp.value == null || !pp.playerName) continue;
-      const key = `${pp.playerName}|${stat}|${pp.value}`;
+      const rt = rtById[pp.marketId] || "";
+      const mm = /^odds_on_pickem_(disposals|goals|marks|tackles|fantasy)$/.exec(rt);
+      if (!mm || pp.value == null || !pp.playerName) continue;
+      const stat = PICKEM_RT[mm[1]];
+      const key = `${pp.playerName}|${stat}`;          // one main line per player+stat
       if (seen.has(key)) continue;
       seen.add(key);
       pickemLines.push({ player: String(pp.playerName).trim(), event: name, market: stat, line: Number(pp.value) });
