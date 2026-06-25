@@ -136,16 +136,22 @@ const DAB_HDR = {
   "x-device-id": process.env.DABBLE_DEVICE_ID || "00000000-0000-0000-0000-000000000000",
   ...(process.env.DABBLE_AUTH ? { authorization: process.env.DABBLE_AUTH.startsWith("Bearer") ? process.env.DABBLE_AUTH : `Bearer ${process.env.DABBLE_AUTH}` } : {}),
 };
-// Genuine fixed-odds two-way markets have resultingType "player_<stat>_over_under".
-// The player + stat live in the MARKET name ("Jai Newcombe Over/Under Disposals");
-// the line + side live in the SELECTION name ("Over 27.5" / "Under 27.5"). The Pick'em
-// product ("odds_on_pickem_*", flat multipliers) is handled separately below.
-// NOTE: Dabble opens these market shells well before it posts prices, so they may be
-// empty (0 priced) until close to game time — Compare populates once prices appear.
+// Dabble posts AFL player props three ways, all genuine fixed odds:
+//   • two-way O/U  — resultingType "*_over_under"; player+stat in the MARKET name
+//                    ("Jai Newcombe Over/Under Disposals"), side+line in the SELECTION
+//                    ("Over 27.5"). Often unpriced shells until near game time.
+//   • threshold singles — MARKET name carries stat+line ("To Have 20+ Disposals",
+//                    "To Score 3+ Goals", "To Get 90+ Fantasy Points", "To Get 5+ Tackles");
+//                    each SELECTION is just a player name with the over price.
+//   • Anytime Goalscorer — MARKET "Anytime Goalscorer", selections = players → goals line 0.5.
+// Multi-leg SGM bundles ("*_sgm"), two-player "combine"/"& " markets, and the flat-multiplier
+// Pick'em product ("odds_on_pickem_*", handled below) are NOT single-player fixed odds → excluded.
 const DAB_OU_TYPE = /_over_under$/i;
-const DAB_MKT_OU = new RegExp(`^(.+?) Over/Under (${STAT_ALT})$`, "i");  // market: player + stat
-const DAB_SIDE = /\b(Over|Under)\b/i;                                    // selection: side
-const DAB_NUM = /([\d.]+)/;                                              // line (selection, else market)
+const DAB_MKT_OU = new RegExp(`^(.+?) Over/Under (${STAT_ALT})$`, "i");      // O/U market: player + stat
+const DAB_SIDE = /\b(Over|Under)\b/i;                                        // O/U selection: side
+const DAB_NUM = /([\d.]+)/;                                                  // line
+const DAB_THRESH = new RegExp(`^To (?:Have|Get|Score|Kick) (\\d+)\\+ (${STAT_ALT})$`, "i"); // single ladder
+const DAB_ANYTIME = /^Anytime Goal\s?scorer$/i;
 
 async function fetchDabble(): Promise<OddsRow[]> {
   const comps = await getJson<any>(`${DAB}/competitions`, DAB_HDR);
@@ -169,35 +175,67 @@ async function fetchDabble(): Promise<OddsRow[]> {
     for (const m of sfd.markets ?? []) rtById[m.id] = (m.resultingType || "").toLowerCase();
     const name = fixture.name || sfd.name || "";
     const [home, away] = name.includes(" v ") ? name.split(" v ", 2) : [null, null];
+    const start = fixture.advertisedStart ?? null;
+    const dab: OddsRow[] = [];
     for (const m of sfd.markets ?? []) {
-      // Only genuine two-way player over/under markets are true fixed odds. Dabble's
-      // Pick'em product ("odds_on_pickem_*"), SGMs and sportcast specials are skipped
-      // so flat-multiplier prices never enter the EV comparison.
-      if (!DAB_OU_TYPE.test(m.resultingType || "")) continue;
-      const mk = DAB_MKT_OU.exec((m.name || "").trim());
-      if (!mk) continue;
-      const market = STAT_MAP[mk[2]] ?? STAT_MAP[mk[2].replace(/\b\w/g, (c) => c.toUpperCase())];
-      if (!market) continue;
-      const player = mk[1].trim();
-      const mNum = DAB_NUM.exec(m.name || "");        // line is sometimes in the market name
-      let line: number | null = null;
-      let over: number | null = null, under: number | null = null;
-      for (const [snm, price] of priceByMkt[m.id] ?? []) {
-        if (!price) continue;
-        const side = DAB_SIDE.exec(snm || "");
-        if (!side) continue;
-        const num = DAB_NUM.exec(snm || "") ?? mNum;
-        if (num) line = Number(num[1]);
-        if (/over/i.test(side[1])) over = Number(price); else under = Number(price);
+      const rt = (m.resultingType || "").toLowerCase();
+      const mname = (m.name || "").trim();
+      const outs = priceByMkt[m.id] ?? [];
+      // Skip multi-leg / two-player products — not single-player fixed odds.
+      if (rt.endsWith("_sgm") || rt.startsWith("combine") || rt.startsWith("special") || / & | and /i.test(mname)) continue;
+
+      // 1) two-way player Over/Under (player + stat in the market name)
+      if (DAB_OU_TYPE.test(rt)) {
+        const mk = DAB_MKT_OU.exec(mname);
+        if (!mk) continue;
+        const market = STAT_MAP[mk[2]] ?? STAT_MAP[mk[2].replace(/\b\w/g, (c) => c.toUpperCase())];
+        if (!market) continue;
+        const player = mk[1].trim();
+        const mNum = DAB_NUM.exec(mname);
+        let line: number | null = null, over: number | null = null, under: number | null = null;
+        for (const [snm, price] of outs) {
+          if (!price) continue;
+          const side = DAB_SIDE.exec(snm || "");
+          if (!side) continue;
+          const num = DAB_NUM.exec(snm || "") ?? mNum;
+          if (num) line = Number(num[1]);
+          if (/over/i.test(side[1])) over = Number(price); else under = Number(price);
+        }
+        if (line == null) continue;
+        if (over) dab.push({ book: "dabble", event: name, home, away, start_iso: start, market, player, line, price: over });
+        if (over && under) ouRows.push({ book: "dabble", event: name, market, player, line, over, under });
+        continue;
       }
-      if (line == null) continue;
-      // Over price → Compare odds ladder; both prices → the two-way Over/Unders feed.
-      if (over) rows.push({
-        book: "dabble", event: name, home, away,
-        start_iso: fixture.advertisedStart ?? null, market, player, line, price: over,
-      });
-      if (over && under) ouRows.push({ book: "dabble", event: name, market, player, line, over, under });
+
+      // 2) threshold singles: "To Have/Get/Score N+ <Stat>" — selections are player names
+      const th = DAB_THRESH.exec(mname);
+      if (th) {
+        const market = STAT_MAP[th[2]] ?? STAT_MAP[th[2].replace(/\b\w/g, (c) => c.toUpperCase())];
+        if (!market) continue;
+        const line = Number(th[1]) - 0.5;
+        for (const [snm, price] of outs) {
+          if (!price || !snm || snm.includes("&")) continue;
+          dab.push({ book: "dabble", event: name, home, away, start_iso: start, market, player: snm.trim(), line, price: Number(price) });
+        }
+        continue;
+      }
+
+      // 3) Anytime Goalscorer → goals over 0.5
+      if (DAB_ANYTIME.test(mname)) {
+        for (const [snm, price] of outs) {
+          if (!price || !snm || snm.includes("&")) continue;
+          dab.push({ book: "dabble", event: name, home, away, start_iso: start, market: "goals", player: snm.trim(), line: 0.5, price: Number(price) });
+        }
+      }
     }
+    // Dabble lists the same player+line under several resultingTypes (e.g. "to_get_30+_disposals"
+    // and "sportcast_to_get_30_plus_disposals"). Keep one row per player+market+line — best price.
+    const best: Record<string, OddsRow> = {};
+    for (const r of dab) {
+      const k = `${r.player}|${r.market}|${r.line}`;
+      if (!best[k] || r.price > best[k].price) best[k] = r;
+    }
+    rows.push(...Object.values(best));
     // Pick'em product: ONLY the main full-game line per player+stat. Dabble bundles
     // alt-line ("sportcast_to_get_30_plus_disposals") and period ("first_qtr"/
     // "first_half") props into playerProps too — those produced bogus lines like
