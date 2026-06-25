@@ -38,6 +38,41 @@ async function getJson<T>(url: string, tries = 4): Promise<T | null> {
 const num = (v: unknown): number => (typeof v === "number" && isFinite(v) ? v : 0);
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
+// Stats the AFL model projects that also drive SuperCoach scoring. We fit
+// SC_avg ≈ Σ w·(per-game stat) so the site can turn the model's stat projections
+// into a SuperCoach score (R²≈0.9), instead of a cruder Fantasy→SC proxy.
+const FIT_STATS = ["kicks", "handballs", "marks", "tackles", "goals", "behinds", "hitouts"] as const;
+
+/** Ordinary least squares via the normal equations (Gaussian elimination). */
+function ols(X: number[][], y: number[]): number[] {
+  const k = X[0].length;
+  const A = Array.from({ length: k }, () => new Array(k).fill(0));
+  const b = new Array(k).fill(0);
+  for (let r = 0; r < X.length; r++) {
+    for (let i = 0; i < k; i++) {
+      b[i] += X[r][i] * y[r];
+      for (let j = 0; j < k; j++) A[i][j] += X[r][i] * X[r][j];
+    }
+  }
+  for (let i = 0; i < k; i++) {            // forward elimination w/ partial pivot
+    let p = i;
+    for (let r = i + 1; r < k; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+    [A[i], A[p]] = [A[p], A[i]]; [b[i], b[p]] = [b[p], b[i]];
+    for (let r = i + 1; r < k; r++) {
+      const f = A[r][i] / A[i][i];
+      for (let j = i; j < k; j++) A[r][j] -= f * A[i][j];
+      b[r] -= f * b[i];
+    }
+  }
+  const w = new Array(k).fill(0);
+  for (let i = k - 1; i >= 0; i--) {
+    let s = b[i];
+    for (let j = i + 1; j < k; j++) s -= A[i][j] * w[j];
+    w[i] = s / A[i][i];
+  }
+  return w;
+}
+
 interface ScPlayer {
   id: number; name: string; first: string; last: string;
   team: string; teamAbbr: string;
@@ -86,8 +121,14 @@ export async function fetchSuperCoach() {
   }
 
   const players: ScPlayer[] = [];
+  const fitX: number[][] = [], fitY: number[] = [];   // for the SC-from-stats fit
   for (const p of raw) {
     const ps = (p.player_stats || [])[0] || {};
+    const g = num(ps.total_games);
+    if (g >= 4 && num(ps.avg) > 20) {
+      fitX.push([...FIT_STATS.map((k) => num(ps[`total_${k}`]) / g), 1]);
+      fitY.push(num(ps.avg));
+    }
     const scores = (series.get(p.id) ?? []).sort((a, b) => a.round - b.round);
     const vals = scores.map((s) => s.pts);
     const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : num(ps.avg);
@@ -114,7 +155,10 @@ export async function fetchSuperCoach() {
       avg: round1(num(ps.avg)),
       avg3: round1(num(ps.avg3)),
       avg5: round1(num(ps.avg5)),
-      proj: round1(num(ps.ppts)),
+      // `ppts1` is SuperCoach's next-round projection (tracks form, corr≈0.86 with
+      // avg). `ppts` is a different, erratic figure (often inflated or ~0) — do NOT
+      // use it. Fall back to the season average when no projection is posted.
+      proj: round1(num(ps.ppts1) || num(ps.avg)),
       games: num(ps.total_games),
       totalPoints: num(ps.total_points),
       std: round1(std),
@@ -135,16 +179,31 @@ export async function fetchSuperCoach() {
   // value = projected points per $100k. Only meaningful for priced, playing types.
   players.sort((a, b) => b.avg - a.avg);
 
+  // Fit SuperCoach score from the stats the AFL model projects, so the site can
+  // turn model stat projections into a modelled SuperCoach score.
+  const w = ols(fitX, fitY);
+  const yMean = fitY.reduce((a, b) => a + b, 0) / fitY.length;
+  const ssTot = fitY.reduce((a, b) => a + (b - yMean) ** 2, 0);
+  const ssRes = fitX.reduce((a, row, i) => a + (fitY[i] - row.reduce((s, v, j) => s + v * w[j], 0)) ** 2, 0);
+  const model_fit = {
+    stats: [...FIT_STATS] as string[],
+    weights: Object.fromEntries(FIT_STATS.map((k, i) => [k, round1(w[i])])) as Record<string, number>,
+    intercept: round1(w[FIT_STATS.length]),
+    r2: round1(1 - ssRes / ssTot) / 1,
+    n: fitY.length,
+  };
+
   const out = {
     generated: new Date().toISOString(),
     season: YEAR,
     round,
     n_players: players.length,
+    model_fit,
     players,
   };
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify(out));
-  console.log(`Wrote ${OUT}: ${players.length} players, round ${round}, ${series.size} with score history`);
+  console.log(`Wrote ${OUT}: ${players.length} players, round ${round}, ${series.size} w/ history; SC-from-stats R²=${model_fit.r2}`);
   return out;
 }
 

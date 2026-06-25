@@ -16,8 +16,20 @@ export interface ScPlayer {
   ven: string | null; venAvg: number;
   next: Array<{ opp: string; home: boolean }>;
 }
+/** Fitted SuperCoach-from-stats model: SC ≈ intercept + Σ weights[stat]·(per-game stat). */
+export interface ScModelFit {
+  stats: string[]; weights: Record<string, number>; intercept: number; r2: number; n: number;
+}
 export interface ScFeed {
-  generated: string; season: number; round: number; n_players: number; players: ScPlayer[];
+  generated: string; season: number; round: number; n_players: number;
+  model_fit?: ScModelFit; players: ScPlayer[];
+}
+
+/** Turn a set of projected per-game stats into a modelled SuperCoach score. */
+export function modelScFromStats(fit: ScModelFit, stats: Record<string, number>): number {
+  let v = fit.intercept;
+  for (const k of fit.stats) v += (fit.weights[k] ?? 0) * (stats[k] ?? 0);
+  return v;
 }
 
 export async function loadSuperCoach(): Promise<ScFeed | null> {
