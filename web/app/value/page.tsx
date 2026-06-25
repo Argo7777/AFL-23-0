@@ -21,6 +21,7 @@ export default function ValuePage() {
   const [mi, setMi] = useState(0);
   const [market, setMarket] = useState<Market>("disposals");
   const [ov, setOv] = useState<Record<string, Override>>({}); // manual overrides
+  const [q, setQ] = useState("");
 
   const [bankroll, setBankroll] = useState(1000);
   const [kFrac, setKFrac] = useState(0.25);
@@ -36,21 +37,23 @@ export default function ValuePage() {
     fetch(`${BASE_PATH}/data/odds-latest.json`).then((r) => r.ok ? r.json() : null).then(setOdds).catch(() => {});
   }, []);
 
-  // best (max) over price per playerKey|market -> line -> price
+  // best over price (and which book) per playerKey|market -> line
   const book = useMemo(() => {
-    const m = new Map<string, Map<number, number>>();
+    const m = new Map<string, Map<number, { price: number; book: string }>>();
     for (const r of odds?.rows ?? []) {
       const k = `${playerKey(r.player)}|${r.market}`;
       let lm = m.get(k); if (!lm) m.set(k, (lm = new Map()));
-      lm.set(r.line, Math.max(lm.get(r.line) ?? 0, r.price));
+      const cur = lm.get(r.line);
+      if (!cur || r.price > cur.price) lm.set(r.line, { price: r.price, book: r.book });
     }
     return m;
   }, [odds]);
+  const BOOK_LABEL: Record<string, string> = { sportsbet: "Sportsbet", tab: "TAB", ladbrokes: "Ladbrokes", dabble: "Dabble" };
 
   const m = data?.matches[mi];
   const computed = useMemo(() => {
     if (!m) return [];
-    return m.players.map((p) => {
+    return m.players.filter((p) => !q || p.player.toLowerCase().includes(q.toLowerCase())).map((p) => {
       const d = p.dist[market];
       const lines = book.get(`${playerKey(p.player)}|${market}`); // line -> best over
       const modelLine = Math.max(0.5, Math.round(d.mean) - 0.5);
@@ -61,7 +64,8 @@ export default function ValuePage() {
       }
       const o = ov[keyOf(p.player_id, market)] ?? {};
       const line = o.line != null && o.line !== "" ? Number(o.line) : defLine;
-      const autoOver = lines?.get(line); // book price at the chosen line (auto-fill)
+      const auto = lines?.get(line); // {price, book} at the chosen line (auto-fill)
+      const autoOver = auto?.price;
       const overOdds = o.over != null && o.over !== "" ? Number(o.over) : (autoOver ?? NaN);
       const underOdds = o.under != null && o.under !== "" ? Number(o.under) : NaN;
 
@@ -71,11 +75,15 @@ export default function ValuePage() {
       const evVal = overOdds > 1 ? ev(modelP, overOdds) : NaN;
       const edge = Number.isFinite(marketP) ? edgePct(modelP, marketP) : NaN;
       const stake = overOdds > 1 ? recommendedStake(modelP, overOdds, bankroll, kFrac) : 0;
+      const isAuto = !o.over && autoOver != null;
       const overStr = o.over != null && o.over !== "" ? o.over : (autoOver != null ? autoOver.toFixed(2) : "");
+      // where the value is: the Over is +EV at this price → name the book
+      const valueAt = Number.isFinite(evVal) && evVal > 0
+        ? `Over${isAuto && auto ? ` · ${BOOK_LABEL[auto.book] ?? auto.book}` : ""}` : "";
       return { p, line: String(o.line ?? defLine), overStr, underStr: o.under ?? "", proj: d.mean,
-        modelP, evVal, edge, overOdds, stake, isAuto: !(o.over) && autoOver != null };
+        modelP, evVal, edge, overOdds, stake, isAuto, valueAt };
     }).sort((a, b) => (Number.isFinite(b.evVal) ? b.evVal : -9) - (Number.isFinite(a.evVal) ? a.evVal : -9));
-  }, [m, market, ov, book, bankroll, kFrac]);
+  }, [m, market, ov, book, bankroll, kFrac, q]);
 
   const setRow = (pid: string, patch: Override) =>
     setOv((prev) => ({ ...prev, [keyOf(pid, market)]: { ...prev[keyOf(pid, market)], ...patch } }));
@@ -87,9 +95,11 @@ export default function ValuePage() {
     <Shell>
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <select value={mi} onChange={(e) => setMi(Number(e.target.value))}
-          className="max-w-[60vw] rounded-lg border border-line bg-card px-3 py-2 text-base">
+          className="max-w-[45vw] rounded-lg border border-line bg-card px-3 py-2 text-base">
           {data.matches.map((mm, i) => <option key={mm.match_id} value={i}>{mm.home_team} v {mm.away_team}</option>)}
         </select>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player…"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-base" />
         <label className="text-xs text-slate-400">Bankroll $
           <input type="number" inputMode="decimal" value={bankroll} min={0}
             onChange={(e) => setBankroll(Number(e.target.value))}
@@ -111,7 +121,7 @@ export default function ValuePage() {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line [-webkit-overflow-scrolling:touch]">
-        <table className="w-full min-w-[40rem] text-sm">
+        <table className="w-full min-w-[46rem] text-sm">
           <thead className="bg-pitch-light text-xs uppercase text-slate-400">
             <tr>
               <th className="px-3 py-2 text-left">Player</th>
@@ -124,6 +134,7 @@ export default function ValuePage() {
               <th className="px-2 py-2 text-right">Edge</th>
               <th className="px-2 py-2 text-right">EV</th>
               <th className="px-2 py-2 text-right">Stake</th>
+              <th className="px-2 py-2 text-left">Value</th>
             </tr>
           </thead>
           <tbody>
@@ -153,6 +164,11 @@ export default function ValuePage() {
                   <td className={"px-2 py-1.5 text-right font-bold " + (pos ? "text-grass" : "text-slate-400")}>
                     {Number.isFinite(row.evVal) ? `${row.evVal > 0 ? "+" : ""}${(row.evVal * 100).toFixed(0)}%` : "–"}</td>
                   <td className="px-2 py-1.5 text-right font-bold text-gold">{row.stake > 0 ? `$${row.stake.toFixed(0)}` : "–"}</td>
+                  <td className="px-2 py-1.5 text-left whitespace-nowrap">
+                    {row.valueAt
+                      ? <span className="rounded bg-grass/15 px-1.5 py-0.5 text-xs font-bold text-grass">{row.valueAt}</span>
+                      : <span className="text-slate-600">–</span>}
+                  </td>
                 </tr>
               );
             })}
@@ -162,7 +178,8 @@ export default function ValuePage() {
       <p className="mt-3 text-xs text-slate-500">
         <span className="text-grass">Green</span> Over prices are auto-filled from the best book; type to
         override, or add an Under to de-vig. Edit the line and the book price re-fills for that line.
-        <b> My $</b> is the model’s fair price; recommended {kFrac === 1 ? "full" : kFrac === 0.5 ? "half" : "quarter"}-Kelly
+        The <b className="text-grass">Value</b> column names the bet when it’s +EV — e.g. “Over · TAB” is the
+        side and book to take. <b>My $</b> is the model’s fair price; recommended {kFrac === 1 ? "full" : kFrac === 0.5 ? "half" : "quarter"}-Kelly
         stake from your ${bankroll.toLocaleString()} bankroll (full Kelly clamped to 20%).
       </p>
       <Disclaimer />

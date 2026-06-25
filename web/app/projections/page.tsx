@@ -12,6 +12,7 @@ export default function ProjectionsPage() {
   const [err, setErr] = useState<string | null>(null);
   const [mi, setMi] = useState(0);
   const [market, setMarket] = useState<Market>("disposals");
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     loadProjections().then(setData).catch((e) => setErr(String(e)));
@@ -35,6 +36,8 @@ export default function ProjectionsPage() {
             </option>
           ))}
         </select>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player…"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-1.5 text-base" />
         <span className="text-xs text-slate-400">
           Round {data.round} · {data.n_sims.toLocaleString()} sims
         </span>
@@ -57,7 +60,7 @@ export default function ProjectionsPage() {
         ))}
       </div>
 
-      <PlayerTable m={m} market={market} />
+      <PlayerTable m={m} market={market} q={q} />
       <p className="mt-4 text-xs text-slate-500">
         Mean / median / spread come from {data.n_sims.toLocaleString()} Monte-Carlo sims per match.
         “Model” is the direct regressor expectation. Lines show P(over).
@@ -110,10 +113,12 @@ function Bar({ label, pct, side }: { label: string; pct: number; side: "home" | 
   );
 }
 
-function PlayerTable({ m, market }: { m: MatchProjection; market: Market }) {
+function PlayerTable({ m, market, q }: { m: MatchProjection; market: Market; q: string }) {
   const rows = useMemo(
-    () => [...m.players].sort((a, b) => b.dist[market].mean - a.dist[market].mean),
-    [m, market],
+    () => m.players
+      .filter((p) => !q || p.player.toLowerCase().includes(q.toLowerCase()))
+      .sort((a, b) => b.dist[market].mean - a.dist[market].mean),
+    [m, market, q],
   );
   // two representative over-lines either side of the median
   const lineFor = (mean: number) => Math.max(0.5, Math.round(mean) - 0.5);

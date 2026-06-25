@@ -26,6 +26,8 @@ export default function PickemPage() {
   const [posted, setPosted] = useState<Map<string, number>>(new Map()); // key -> Dabble line
   const [havePosted, setHavePosted] = useState(false);
   const [mode, setMode] = useState<"dabble" | "manual">("dabble"); // auto-fill from Dabble vs all players
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "conf", dir: -1 });
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     loadProjections().then(setProj).catch(() => setErr("Projections feed not built."));
@@ -48,6 +50,7 @@ export default function PickemPage() {
       for (const p of mt.players) {
         const d = p.dist[market];
         if (!d || d.mean < 1) continue;
+        if (q && !p.player.toLowerCase().includes(q.toLowerCase())) continue;
         const key = `${playerKey(p.player)}|${market}`;
         const postedLine = posted.get(key);
         // Dabble mode: only the lines Dabble actually posted (auto-filled board)
@@ -58,8 +61,30 @@ export default function PickemPage() {
         out.push({ key, p, match, line, pOver, lean, conf: Math.abs(pOver - 0.5), isPosted: postedLine != null });
       }
     }
-    return out.sort((a, b) => Number(b.isPosted) - Number(a.isPosted) || b.conf - a.conf);
-  }, [proj, market, matchFilter, lines, posted, mode, havePosted]);
+    const val = (r: typeof out[number]): number | string =>
+      sort.key === "player" ? r.p.player
+      : sort.key === "proj" ? r.p.dist[market].mean : sort.key === "line" ? r.line
+      : sort.key === "over" ? r.pOver : sort.key === "under" ? 1 - r.pOver
+      : r.conf; // default: model confidence (lean strength)
+    out.sort((a, b) => {
+      const va = val(a), vb = val(b);
+      if (typeof va === "string") return va.localeCompare(vb as string) * sort.dir;
+      return (va - (vb as number)) * sort.dir;
+    });
+    return out;
+  }, [proj, market, matchFilter, lines, posted, mode, havePosted, sort, q]);
+
+  const dabbleCount = useMemo(() => {
+    if (!proj || !havePosted) return 0;
+    let n = 0;
+    for (const mt of proj.matches)
+      for (const p of mt.players)
+        if (posted.has(`${playerKey(p.player)}|${market}`)) n++;
+    return n;
+  }, [proj, posted, market, havePosted]);
+
+  const sortBy = (key: string) =>
+    setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) as 1 | -1 : (key === "player" ? 1 : -1) }));
 
   const inSlip = (key: string) => slip.find((l) => l.key === key);
   const toggleLeg = (key: string, player: string, line: number, side: "over" | "under", prob: number) =>
@@ -93,7 +118,7 @@ export default function PickemPage() {
           <button onClick={() => setMode("dabble")} disabled={!havePosted}
             className={"rounded-md px-3 py-1.5 font-bold transition " +
               (mode === "dabble" ? "bg-grass text-pitch" : "text-slate-300 disabled:text-slate-600")}>
-            {havePosted ? "Dabble lines ★" : "Dabble (soon)"}
+            {havePosted ? `Dabble ★ (${dabbleCount})` : "Dabble (soon)"}
           </button>
           <button onClick={() => setMode("manual")}
             className={"rounded-md px-3 py-1.5 font-bold transition " + (mode === "manual" ? "bg-grass text-pitch" : "text-slate-300")}>
@@ -101,10 +126,12 @@ export default function PickemPage() {
           </button>
         </div>
         <select value={matchFilter} onChange={(e) => setMatchFilter(e.target.value)}
-          className="max-w-[55vw] rounded-lg border border-line bg-card px-2.5 py-2 text-base">
+          className="max-w-[40vw] rounded-lg border border-line bg-card px-2.5 py-2 text-base">
           <option value="all">All matches</option>
           {matches.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player…"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-base" />
       </div>
       <div className="-mx-3 mb-3 flex gap-1.5 overflow-x-auto px-3 pb-1">
         {PICKEM_MARKETS.map(([k, label]) => (
@@ -120,11 +147,11 @@ export default function PickemPage() {
         <table className="w-full min-w-[32rem] border-separate border-spacing-0 text-sm">
           <thead className="text-xs uppercase text-slate-400">
             <tr>
-              <th className="sticky left-0 z-10 bg-pitch px-2 py-2 text-left">Player</th>
-              <th className="bg-pitch px-2 py-2 text-right">Proj</th>
-              <th className="bg-pitch px-2 py-2 text-right">Line</th>
-              <th className="bg-pitch px-2 py-2 text-center">Under</th>
-              <th className="bg-pitch px-2 py-2 text-center">Over</th>
+              <ThP k="player" label="Player" align="left" sticky sort={sort} onSort={sortBy} />
+              <ThP k="proj" label="Proj" sort={sort} onSort={sortBy} />
+              <ThP k="line" label="Line" sort={sort} onSort={sortBy} />
+              <ThP k="under" label="Under" align="center" sort={sort} onSort={sortBy} />
+              <ThP k="over" label="Over" align="center" sort={sort} onSort={sortBy} />
             </tr>
           </thead>
           <tbody>
@@ -193,6 +220,22 @@ export default function PickemPage() {
 
       <Disclaimer />
     </Shell>
+  );
+}
+
+function ThP({ k, label, align = "right", sticky = false, sort, onSort }: {
+  k: string; label: string; align?: "left" | "right" | "center"; sticky?: boolean;
+  sort: { key: string; dir: 1 | -1 }; onSort: (k: string) => void;
+}) {
+  const active = sort.key === k;
+  const a = align === "left" ? "text-left" : align === "center" ? "text-center" : "text-right";
+  return (
+    <th className={(sticky ? "sticky left-0 z-10 " : "") + "bg-pitch px-2 py-2 " + a}>
+      <button onClick={() => onSort(k)}
+        className={"font-bold uppercase tracking-wide " + (active ? "text-slate-100" : "text-slate-400 hover:text-slate-200")}>
+        {label}{active ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
+      </button>
+    </th>
   );
 }
 

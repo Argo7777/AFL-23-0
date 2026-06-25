@@ -15,6 +15,7 @@ export default function LineupsPage() {
   const [proj, setProj] = useState<ProjectionsOutput | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [mi, setMi] = useState(0);
+  const [q, setQ] = useState("");
 
   useEffect(() => { loadProjections().then(setProj).catch(() => setErr("Projections feed not built.")); }, []);
 
@@ -26,17 +27,19 @@ export default function LineupsPage() {
     <Shell>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <select value={mi} onChange={(e) => setMi(Number(e.target.value))}
-          className="max-w-[80vw] rounded-lg border border-line bg-card px-2.5 py-2 text-base">
+          className="max-w-[45vw] rounded-lg border border-line bg-card px-2.5 py-2 text-base">
           {proj.matches.map((mm, i) => (
             <option key={mm.match_id} value={i}>{mm.home_team} v {mm.away_team}</option>
           ))}
         </select>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player…"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-base" />
         <span className="text-xs text-slate-400">Round {proj.round}</span>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <TeamLineup m={m} home />
-        <TeamLineup m={m} home={false} />
+        <TeamLineup m={m} home q={q} />
+        <TeamLineup m={m} home={false} q={q} />
       </div>
 
       <p className="mt-4 text-xs text-slate-500">
@@ -47,13 +50,13 @@ export default function LineupsPage() {
   );
 }
 
-function TeamLineup({ m, home }: { m: MatchProjection; home: boolean }) {
+function TeamLineup({ m, home, q }: { m: MatchProjection; home: boolean; q: string }) {
   const team = home ? m.home_team : m.away_team;
   const players = useMemo(
     () => m.players
-      .filter((p) => (home ? p.is_home : !p.is_home))
+      .filter((p) => (home ? p.is_home : !p.is_home) && (!q || p.player.toLowerCase().includes(q.toLowerCase())))
       .sort((a, b) => (ROLE_ORDER[a.role] ?? 4) - (ROLE_ORDER[b.role] ?? 4) || b.dist.disposals.mean - a.dist.disposals.mean),
-    [m, home],
+    [m, home, q],
   );
   return (
     <div className="rounded-xl border border-line">

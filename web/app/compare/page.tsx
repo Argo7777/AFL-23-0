@@ -31,6 +31,7 @@ export default function ComparePage() {
   const [bankroll, setBankroll] = useState(1000);
   const [kFrac, setKFrac] = useState(0.25);
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "ev", dir: -1 });
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     loadProjections().then(setProj).catch(() => setErr("Projections feed not built."));
@@ -68,6 +69,7 @@ export default function ComparePage() {
       const hit = index.get(playerKey(r.player));
       if (!hit) continue;
       if (matchFilter !== "all" && hit.match !== matchFilter) continue;
+      if (q && !hit.p.player.toLowerCase().includes(q.toLowerCase())) continue;
       const key = `${playerKey(r.player)}|${r.line}`;
       let g = groups.get(key);
       if (!g) {
@@ -96,7 +98,7 @@ export default function ComparePage() {
       return (va - (vb as number)) * sort.dir;
     });
     return filtered;
-  }, [odds, index, market, matchFilter, hidden, posOnly, bankroll, kFrac, sort]);
+  }, [odds, index, market, matchFilter, hidden, posOnly, bankroll, kFrac, sort, q]);
 
   const sortBy = (key: string) =>
     setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) as 1 | -1 : (key === "player" || key === "line" ? 1 : -1) }));
@@ -113,10 +115,12 @@ export default function ComparePage() {
       <div className="mb-3 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <select value={matchFilter} onChange={(e) => setMatchFilter(e.target.value)}
-            className="min-w-0 max-w-[60vw] rounded-lg border border-line bg-card px-2.5 py-2 text-base">
+            className="min-w-0 max-w-[40vw] rounded-lg border border-line bg-card px-2.5 py-2 text-base">
             <option value="all">All matches</option>
             {matches.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search player…"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-base" />
           <label className="flex items-center gap-1.5 text-xs text-slate-400">
             <input type="checkbox" checked={posOnly} onChange={(e) => setPosOnly(e.target.checked)}
               className="h-4 w-4 accent-grass" /> +EV only
