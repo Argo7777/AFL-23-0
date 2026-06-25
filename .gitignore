@@ -23,3 +23,6 @@ engine_ref/
 !.env.example
 *.token
 tokens.json
+
+# TS incremental build info (generated)
+*.tsbuildinfo
