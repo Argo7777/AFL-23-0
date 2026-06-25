@@ -1,0 +1,69 @@
+name: Model & odds refresh
+
+# Every 3h: pull the latest projection inputs (lineups) from AFL-Modelling, run the
+# Monte-Carlo, refresh player-prop odds, then rebuild and deploy the site. This is
+# the fast loop that keeps projections/odds/lineups current between the weekly
+# historical re-scrape in refresh.yml. Offset 30 min past the hour so AFL-Modelling's
+# every-3h predict job has refreshed projection_inputs.json first.
+
+on:
+  schedule:
+    - cron: "30 */3 * * *"   # every 3 hours, 30 min past
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages           # shared with refresh.yml + deploy.yml so deploys never race
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Pull latest projection inputs (lineups) + run Monte-Carlo
+        # Non-fatal: a model hiccup must never block the odds refresh / deploy.
+        continue-on-error: true
+        run: |
+          curl -fsSL -o pipeline/data/projection_inputs.json \
+            https://raw.githubusercontent.com/DanielTomaro13/AFL-Modelling/main/artifacts/projection_inputs.json
+          npm run projections --prefix pipeline
+
+      - name: Refresh player-prop odds (Sportsbet, Dabble, TAB, Ladbrokes)
+        # Non-fatal — books may geo-block CI. Sportsbet + Dabble need no auth;
+        # TAB and Ladbrokes activate when their secrets/vars are set.
+        continue-on-error: true
+        env:
+          TAB_CLIENT_ID: ${{ secrets.TAB_CLIENT_ID }}
+          TAB_CLIENT_SECRET: ${{ secrets.TAB_CLIENT_SECRET }}
+          DABBLE_AUTH: ${{ secrets.DABBLE_AUTH }}
+          LAD_AFL_CATEGORY_ID: ${{ vars.LAD_AFL_CATEGORY_ID }}
+        run: npm run odds --prefix pipeline
+
+      - name: Commit refreshed projections + odds
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pipeline/data/projection_inputs.json web/public/data
+          git diff --cached --quiet || git commit -m "Model & odds refresh ($(date -u +%Y-%m-%dT%H:%MZ))"
+          git push
+
+      # GITHUB_TOKEN pushes don't trigger deploy.yml, so build + publish here too.
+      - run: npm run build -w web
+        env:
+          NEXT_PUBLIC_LEADERBOARD_URL: ${{ vars.LEADERBOARD_URL }}
+      - name: Publish to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: web/out
+          force_orphan: true
+          cname: afl23-0.com
