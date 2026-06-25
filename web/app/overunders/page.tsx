@@ -58,9 +58,10 @@ export default function OverUndersPage() {
         if (!d || d.mean < 1) continue;
         if (q && !p.player.toLowerCase().includes(q.toLowerCase())) continue;
         const lines = book.get(playerKey(p.player));
-        // main line = book line nearest the projection, else the model's half-line
-        let line = Math.max(0.5, Math.round(d.mean) - 0.5);
-        if (lines && lines.size) line = [...lines.keys()].reduce((b, l) => Math.abs(l - d.mean) < Math.abs(b - d.mean) ? l : b, [...lines.keys()][0]);
+        // only players the bookmakers actually price (real over/under markets)
+        if (!lines || !lines.size) continue;
+        // main line = book line nearest the projection
+        const line = [...lines.keys()].reduce((b, l) => Math.abs(l - d.mean) < Math.abs(b - d.mean) ? l : b, [...lines.keys()][0]);
         const over = probOver(d, line);
         const auto = lines?.get(line);
         const evOver = auto ? ev(over, auto.price) : NaN;
@@ -155,7 +156,8 @@ export default function OverUndersPage() {
         One line per player — the main line nearest the projection. The bar shows the model’s
         <span className="text-grass"> Over</span> vs <span className="text-hot">Under</span> probability;
         <b> Best Over</b> is the top book price (green when it beats the model’s fair price). For every
-        alternate line and all four books side by side, see <b>Compare odds</b>.
+        alternate line across the bookmakers side by side, see <b>Compare odds</b>. Only players the
+        bookmakers actually price are shown (Dabble Pick’em lives on the <b>Pick’em</b> page).
       </p>
       <Disclaimer />
     </Shell>

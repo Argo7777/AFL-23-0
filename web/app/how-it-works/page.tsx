@@ -56,10 +56,11 @@ export default function HowItWorks() {
           consistent distribution for every player and market.
         </Step>
         <Step n={5} title="Comparing the books">
-          The <b>Compare</b> page pulls live player-line odds from <b>Sportsbet</b>, <b>Dabble</b>,
-          <b>TAB</b> and <b>Ladbrokes</b> and lays every book’s price side by side for each line, with
-          the best highlighted. Next to them sits the model’s own probability and fair price, so you
-          can see at a glance where a book is paying over the odds.
+          The <b>Compare</b> page pulls live player-line odds from <b>Sportsbet</b>, <b>TAB</b> and
+          <b>Ladbrokes</b> and lays every book’s price side by side for each line, with the best
+          highlighted. Next to them sits the model’s own probability and fair price, so you can see at
+          a glance where a book is paying over the odds. (Dabble is a Pick’em product, not fixed odds,
+          so it lives on the <b>Pick’em</b> page.)
         </Step>
         <Step n={6} title="Value & Kelly staking">
           From the best available price we report the <b>edge</b> (model probability − the market’s

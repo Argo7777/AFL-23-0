@@ -287,7 +287,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <main className="mx-auto max-w-5xl px-3 py-5">
       <h1 className="font-display mb-1 text-2xl font-black text-grass">Compare odds</h1>
       <p className="mb-4 text-sm text-slate-400">
-        Sportsbet, TAB, Ladbrokes &amp; Dabble side by side, with the model’s fair price, best-price
+        Sportsbet, TAB &amp; Ladbrokes side by side, with the model’s fair price, best-price
         edge and Kelly staking.
       </p>
       <ModelNav />

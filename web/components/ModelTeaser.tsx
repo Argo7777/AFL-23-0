@@ -30,8 +30,8 @@ export default function ModelTeaser() {
             🎯 The Model{data ? ` · Round ${data.round}` : ""}
           </div>
           <p className="mt-0.5 text-xs text-slate-400 sm:text-sm">
-            Player projections for 10 markets, a 4-book odds comparison (Sportsbet · TAB ·
-            Ladbrokes · Dabble), value edges &amp; Kelly staking.
+            Player projections for 10 markets, a bookmaker odds comparison (Sportsbet · TAB ·
+            Ladbrokes), Dabble Pick’em, value edges &amp; Kelly staking.
           </p>
         </div>
         <Link href="/projections"

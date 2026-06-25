@@ -294,9 +294,11 @@ export async function fetchOdds() {
   const results = await Promise.allSettled([fetchSportsbet(), fetchDabble(), fetchTab(), fetchLadbrokes()]);
   const rows: OddsRow[] = [];
   for (const r of results) if (r.status === "fulfilled") rows.push(...r.value);
-  // drop deep-longshot ladder rungs the Compare page never shows (price ≤ 8) —
-  // keeps the published feed small without losing any liquid line.
-  const kept = rows.filter((r) => r.price <= 8);
+  // Dabble's two-way "O/U" markets are its Pick'em product (flat ~1.85 prices),
+  // not competitive fixed odds — keep them out of the odds feed (they live in
+  // pickem-latest.json for the Pick'em page). Only real bookmaker prices here.
+  // Also drop deep-longshot ladder rungs the Compare page never shows (price ≤ 8).
+  const kept = rows.filter((r) => r.price <= 8 && r.book !== "dabble");
   const books = [...new Set(kept.map((r) => r.book))];
   const generated = new Date().toISOString();
   const out = { generated, books, n_rows: kept.length, rows: kept };
