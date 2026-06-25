@@ -1,10 +1,11 @@
 /**
- * AFL player-prop odds from four books → web/public/data/odds-latest.json
+ * AFL player-prop odds from five books → web/public/data/odds-latest.json
  *
  *   Sportsbet  public JSON, no auth   — "K+ Stat" threshold markets
  *   Dabble     public JSON, no auth   — "<Player> - <Stat> O/U (L)" markets
  *   TAB        OAuth2 (env creds)     — "K+ Disposals" / "To Kick K+ Goals" propositions
  *   Ladbrokes  public JSON, no auth   — GraphQL event list → REST event-card "To Have K+ Stat"
+ *   PointsBet  public JSON, no auth   — "Player Disposals Over/Under" + "To Get/Pick Your Own" ladders
  *
  * Every book normalises to one OddsRow. A row is the "over" side at a given line
  * (price = P(value > line)), so the Compare page prices it directly against the
@@ -335,9 +336,98 @@ async function fetchLadbrokes(): Promise<OddsRow[]> {
   return rows;
 }
 
+// ───────────────────────────── PointsBet (no auth) ─────────────────────────────
+// Anonymous JSON. AFL competition key from /sports/list, events from the featured
+// feed, then the full book per event. PointsBet's AFL market names are idiosyncratic:
+//   "Player Disposals Over/Under"  → two-way O/U ("<Player> Over 21.5" / "Under 21.5")
+//   "To Get Disposals" / "To Kick Goals" / "To Get Fantasy Points"  → "<Player> N+" ladders
+//   "Pick Your Own Tackles|Marks|Clearances"                        → "<Player> N+" ladders
+// (the per-quarter, head-to-head, "Leading Disposals Group" etc. markets are ignored.)
+const PB_V2 = "https://api.au.pointsbet.com/api/v2";
+const PB_MES = "https://api.au.pointsbet.com/api/mes/v3";
+const PB_HDR = { "User-Agent": "Mozilla/5.0", Accept: "application/json", Origin: "https://pointsbet.com.au" };
+// stripped market name → model market key
+const PB_OU = new RegExp(`^Player (${STAT_ALT}) Over/Under$`, "i");          // two-way O/U
+const PB_THRESH: Record<string, string> = {                                  // "<Player> N+" ladders
+  "to get disposals": "disposals", "to kick goals": "goals",
+  "to get fantasy points": "dreamTeamPoints", "to get kicks": "kicks",
+  "to get handballs": "handballs", "to get marks": "marks",
+  "to get tackles": "tackles", "to get clearances": "totalClearances",
+  "pick your own tackles": "tackles", "pick your own marks": "marks",
+  "pick your own clearances": "totalClearances", "pick your own kicks": "kicks",
+  "pick your own handballs": "handballs", "pick your own disposals": "disposals",
+};
+const PB_PLUS = /^(.+?)\s+(\d+(?:\.\d+)?)\+$/;            // "Mitch Lewis 10+"
+const PB_OVU = /^(.+?)\s+(Over|Under)\s+([\d.]+)$/i;      // "Brent Daniels Over 21.5"
+
+async function pointsbetAflKey(): Promise<string | null> {
+  const d = await getJson<any>(`${PB_V2}/sports/list/`, PB_HDR);
+  const sports = (d?.sports ?? d) || [];
+  for (const s of sports) {
+    if (/aussie rules|australian rules/i.test(String(s.name || ""))) {
+      for (const c of s.competitions ?? []) {
+        if (String(c.name || "").trim().toLowerCase() === "afl")
+          return String(c.key ?? c.competitionKey ?? c.id);
+      }
+    }
+  }
+  return null;
+}
+
+async function fetchPointsbet(): Promise<OddsRow[]> {
+  const key = await pointsbetAflKey();
+  if (!key) { console.log("  [pointsbet] AFL competition not found"); return []; }
+  const feat = await getJson<any>(`${PB_MES}/events/featured/competition/${key}`, PB_HDR);
+  const evs = (feat?.events ?? feat) || [];
+  const rows: OddsRow[] = [];
+  for (const ev of evs) {
+    const eid = ev.key ?? ev.eventId ?? ev.id;
+    if (!eid) continue;
+    const name = ev.name || `${ev.homeTeam} v ${ev.awayTeam}`;
+    const home = ev.homeTeam ?? null, away = ev.awayTeam ?? null, start = ev.startsAt ?? null;
+    const det = await getJson<any>(`${PB_MES}/events/${eid}`, PB_HDR);
+    const markets = det?.fixedOddsMarkets ?? det?.markets ?? [];
+    for (const m of markets) {
+      const mname = stripTeam(m.name || "");          // drop trailing " (Home v Away)"
+      const ouM = PB_OU.exec(mname);
+      const threshMarket = PB_THRESH[mname.toLowerCase()];
+      if (ouM) {
+        const market = STAT_MAP[ouM[1]] ?? STAT_MAP[ouM[1].replace(/\b\w/g, (c) => c.toUpperCase())];
+        if (!market) continue;
+        const byPlayer: Record<string, { over?: number; under?: number; line?: number }> = {};
+        for (const o of m.outcomes ?? []) {
+          const mm = PB_OVU.exec((o.name || "").trim());
+          if (!mm || !o.price) continue;
+          const rec = (byPlayer[mm[1].trim()] ??= {});
+          rec.line = o.points != null ? Number(o.points) : Number(mm[3]);
+          if (/over/i.test(mm[2])) rec.over = Number(o.price); else rec.under = Number(o.price);
+        }
+        for (const [player, r] of Object.entries(byPlayer)) {
+          if (r.line == null) continue;
+          if (r.over) rows.push({ book: "pointsbet", event: name, home, away, start_iso: start, market, player, line: r.line, price: r.over });
+          if (r.over && r.under) ouRows.push({ book: "pointsbet", event: name, market, player, line: r.line, over: r.over, under: r.under });
+        }
+        continue;
+      }
+      if (threshMarket) {
+        for (const o of m.outcomes ?? []) {
+          const mm = PB_PLUS.exec((o.name || "").trim());
+          if (!mm || !o.price) continue;
+          const n = o.points != null ? Number(o.points) : Number(mm[2]);
+          rows.push({ book: "pointsbet", event: name, home, away, start_iso: start,
+            market: threshMarket, player: mm[1].trim(), line: n - 0.5, price: Number(o.price) });
+        }
+      }
+    }
+    await sleep(250);
+  }
+  console.log(`  [pointsbet] ${evs.length} events, ${rows.length} rows`);
+  return rows;
+}
+
 // ───────────────────────────── aggregate ─────────────────────────────
 export async function fetchOdds() {
-  const results = await Promise.allSettled([fetchSportsbet(), fetchDabble(), fetchTab(), fetchLadbrokes()]);
+  const results = await Promise.allSettled([fetchSportsbet(), fetchDabble(), fetchTab(), fetchLadbrokes(), fetchPointsbet()]);
   const rows: OddsRow[] = [];
   for (const r of results) if (r.status === "fulfilled") rows.push(...r.value);
   // Dabble's genuine fixed-odds player over/under markets are included; its separate
