@@ -6,6 +6,7 @@ import { loadProjections, type ProjectionsOutput } from "@/lib/modeldb";
 
 const LINKS: [string, string][] = [
   ["Projections", "/projections"],
+  ["Fantasy XXII", "/fantasy"],
   ["Lineups", "/lineups"],
   ["Compare odds", "/compare"],
   ["Pick’em", "/pickem"],

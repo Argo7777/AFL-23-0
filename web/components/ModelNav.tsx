@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 const TABS: [string, string][] = [
   ["Projections", "/projections"],
+  ["Fantasy", "/fantasy"],
   ["Lineups", "/lineups"],
   ["Compare odds", "/compare"],
   ["Over / Unders", "/overunders"],
