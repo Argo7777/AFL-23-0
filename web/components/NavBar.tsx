@@ -11,6 +11,7 @@ const LINKS: [string, string][] = [
   ["Honours", "/honours"],
   ["Predict", "/predict"],
   ["Model", "/projections"],
+  ["Fantasy", "/fantasy"],
 ];
 
 /** Slim sitewide nav — gives the stats-site feel and strong internal linking. */

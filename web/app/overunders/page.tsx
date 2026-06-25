@@ -146,9 +146,11 @@ export default function OverUndersPage() {
                     </td>
                     <td className={"border-t border-line/40 px-2 py-2 text-right " + (r.side === "Over" && val ? "font-bold text-grass" : "text-slate-200")}>
                       {r.overP.toFixed(2)}<span className="ml-1 text-[10px] text-slate-600">{fairOdds(r.mOver).toFixed(2)}</span>
+                      <div className="text-[10px] font-normal leading-tight text-slate-500">{BOOK_LABEL[r.overBook] ?? r.overBook}</div>
                     </td>
                     <td className={"border-t border-line/40 px-2 py-2 text-right " + (r.side === "Under" && val ? "font-bold text-grass" : "text-slate-200")}>
                       {r.underP.toFixed(2)}<span className="ml-1 text-[10px] text-slate-600">{fairOdds(r.mUnder).toFixed(2)}</span>
+                      <div className="text-[10px] font-normal leading-tight text-slate-500">{BOOK_LABEL[r.underBook] ?? r.underBook}</div>
                     </td>
                     <td className="border-t border-line/40 px-2 py-2 text-right">
                       {val
