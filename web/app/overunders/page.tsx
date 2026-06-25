@@ -11,7 +11,7 @@ import { fairOdds, ev, devigTwoWay } from "@/lib/staking";
 import { BASE_PATH } from "@/lib/game/data";
 
 interface OuRow { book: string; market: string; player: string; line: number; over: number; under: number }
-const BOOK_LABEL: Record<string, string> = { sportsbet: "Sportsbet", tab: "TAB", ladbrokes: "Ladbrokes" };
+const BOOK_LABEL: Record<string, string> = { sportsbet: "Sportsbet", tab: "TAB", ladbrokes: "Ladbrokes", dabble: "Dabble" };
 const normName = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim();
 
 /** Real two-way over/under board: only players the bookmakers actually price, with

@@ -134,7 +134,12 @@ const DAB_HDR = {
   "x-device-id": process.env.DABBLE_DEVICE_ID || "00000000-0000-0000-0000-000000000000",
   ...(process.env.DABBLE_AUTH ? { authorization: process.env.DABBLE_AUTH.startsWith("Bearer") ? process.env.DABBLE_AUTH : `Bearer ${process.env.DABBLE_AUTH}` } : {}),
 };
-const DAB_OU = new RegExp(`^(.+?) - (${STAT_ALT}) O/U \\(([\\d.]+)\\)$`);
+// Genuine fixed-odds two-way markets have resultingType "player_<stat>_over_under"
+// (e.g. "Lachie Neale Over/Under Disposals") with selection names carrying the line,
+// e.g. "Lachie Neale Over 27.5 Disposals". The Pick'em product is a separate
+// "odds_on_pickem_*" type with flat multipliers — excluded from the odds feed.
+const DAB_OU_TYPE = /_over_under$/i;
+const DAB_SEL = new RegExp(`^(.+?) (Over|Under) ([\\d.]+) (${STAT_ALT})$`, "i");
 
 async function fetchDabble(): Promise<OddsRow[]> {
   const comps = await getJson<any>(`${DAB}/competitions`, DAB_HDR);
@@ -157,22 +162,27 @@ async function fetchDabble(): Promise<OddsRow[]> {
     const name = fixture.name || sfd.name || "";
     const [home, away] = name.includes(" v ") ? name.split(" v ", 2) : [null, null];
     for (const m of sfd.markets ?? []) {
-      // Dabble runs a Pick'em (flat multiplier) product alongside its sportsbook;
-      // exclude it so only true fixed-odds lines enter the EV comparison.
-      const rt = (m.resultingType || "").toLowerCase();
-      if (rt.startsWith("pickem") || rt === "player_sgm") continue;
-      const mm = DAB_OU.exec((m.name || "").trim());
-      if (!mm) continue;
-      const market = STAT_MAP[mm[2]];
-      if (!market) continue;
-      const line = Number(mm[3]);
+      // Only genuine two-way player over/under markets are true fixed odds. Dabble's
+      // Pick'em product ("odds_on_pickem_*"), SGMs and sportcast specials are skipped
+      // so flat-multiplier prices never enter the EV comparison.
+      if (!DAB_OU_TYPE.test(m.resultingType || "")) continue;
+      let player: string | null = null, market: string | null = null, line: number | null = null;
+      let over: number | null = null, under: number | null = null;
       for (const [snm, price] of priceByMkt[m.id] ?? []) {
-        // selection names are the full phrase, e.g. "Zac Bailey Over 22.5 Disposals"
-        if (snm && /\bover\b/i.test(snm) && !/\bunder\b/i.test(snm) && price) rows.push({
-          book: "dabble", event: name, home, away,
-          start_iso: fixture.advertisedStart ?? null, market, player: mm[1].trim(), line, price: Number(price),
-        });
+        const mm = DAB_SEL.exec((snm || "").trim());
+        if (!mm || !price) continue;
+        const st = STAT_MAP[mm[4]] ?? STAT_MAP[mm[4].replace(/\b\w/g, (c) => c.toUpperCase())];
+        if (!st) continue;
+        player = mm[1].trim(); market = st; line = Number(mm[3]);
+        if (/^over$/i.test(mm[2])) over = Number(price); else under = Number(price);
       }
+      if (player == null || market == null || line == null) continue;
+      // Over price → Compare odds ladder; both prices → the two-way Over/Unders feed.
+      if (over) rows.push({
+        book: "dabble", event: name, home, away,
+        start_iso: fixture.advertisedStart ?? null, market, player, line, price: over,
+      });
+      if (over && under) ouRows.push({ book: "dabble", event: name, market, player, line, over, under });
     }
     // Pick'em product: one line per player+stat (over/under share a value)
     const seen = new Set<string>();
@@ -321,11 +331,11 @@ export async function fetchOdds() {
   const results = await Promise.allSettled([fetchSportsbet(), fetchDabble(), fetchTab(), fetchLadbrokes()]);
   const rows: OddsRow[] = [];
   for (const r of results) if (r.status === "fulfilled") rows.push(...r.value);
-  // Dabble's two-way "O/U" markets are its Pick'em product (flat ~1.85 prices),
-  // not competitive fixed odds — keep them out of the odds feed (they live in
-  // pickem-latest.json for the Pick'em page). Only real bookmaker prices here.
-  // Also drop deep-longshot ladder rungs the Compare page never shows (price ≤ 8).
-  const kept = rows.filter((r) => r.price <= 8 && r.book !== "dabble");
+  // Dabble's genuine fixed-odds player over/under markets are included; its separate
+  // Pick'em product (flat multipliers) is filtered out upstream and lives in
+  // pickem-latest.json for the Pick'em page. Drop deep-longshot ladder rungs the
+  // Compare page never shows (price ≤ 8).
+  const kept = rows.filter((r) => r.price <= 8);
   const books = [...new Set(kept.map((r) => r.book))];
   const generated = new Date().toISOString();
   const out = { generated, books, n_rows: kept.length, rows: kept };
