@@ -136,12 +136,16 @@ const DAB_HDR = {
   "x-device-id": process.env.DABBLE_DEVICE_ID || "00000000-0000-0000-0000-000000000000",
   ...(process.env.DABBLE_AUTH ? { authorization: process.env.DABBLE_AUTH.startsWith("Bearer") ? process.env.DABBLE_AUTH : `Bearer ${process.env.DABBLE_AUTH}` } : {}),
 };
-// Genuine fixed-odds two-way markets have resultingType "player_<stat>_over_under"
-// (e.g. "Lachie Neale Over/Under Disposals") with selection names carrying the line,
-// e.g. "Lachie Neale Over 27.5 Disposals". The Pick'em product is a separate
-// "odds_on_pickem_*" type with flat multipliers — excluded from the odds feed.
+// Genuine fixed-odds two-way markets have resultingType "player_<stat>_over_under".
+// The player + stat live in the MARKET name ("Jai Newcombe Over/Under Disposals");
+// the line + side live in the SELECTION name ("Over 27.5" / "Under 27.5"). The Pick'em
+// product ("odds_on_pickem_*", flat multipliers) is handled separately below.
+// NOTE: Dabble opens these market shells well before it posts prices, so they may be
+// empty (0 priced) until close to game time — Compare populates once prices appear.
 const DAB_OU_TYPE = /_over_under$/i;
-const DAB_SEL = new RegExp(`^(.+?) (Over|Under) ([\\d.]+) (${STAT_ALT})$`, "i");
+const DAB_MKT_OU = new RegExp(`^(.+?) Over/Under (${STAT_ALT})$`, "i");  // market: player + stat
+const DAB_SIDE = /\b(Over|Under)\b/i;                                    // selection: side
+const DAB_NUM = /([\d.]+)/;                                              // line (selection, else market)
 
 async function fetchDabble(): Promise<OddsRow[]> {
   const comps = await getJson<any>(`${DAB}/competitions`, DAB_HDR);
@@ -170,17 +174,23 @@ async function fetchDabble(): Promise<OddsRow[]> {
       // Pick'em product ("odds_on_pickem_*"), SGMs and sportcast specials are skipped
       // so flat-multiplier prices never enter the EV comparison.
       if (!DAB_OU_TYPE.test(m.resultingType || "")) continue;
-      let player: string | null = null, market: string | null = null, line: number | null = null;
+      const mk = DAB_MKT_OU.exec((m.name || "").trim());
+      if (!mk) continue;
+      const market = STAT_MAP[mk[2]] ?? STAT_MAP[mk[2].replace(/\b\w/g, (c) => c.toUpperCase())];
+      if (!market) continue;
+      const player = mk[1].trim();
+      const mNum = DAB_NUM.exec(m.name || "");        // line is sometimes in the market name
+      let line: number | null = null;
       let over: number | null = null, under: number | null = null;
       for (const [snm, price] of priceByMkt[m.id] ?? []) {
-        const mm = DAB_SEL.exec((snm || "").trim());
-        if (!mm || !price) continue;
-        const st = STAT_MAP[mm[4]] ?? STAT_MAP[mm[4].replace(/\b\w/g, (c) => c.toUpperCase())];
-        if (!st) continue;
-        player = mm[1].trim(); market = st; line = Number(mm[3]);
-        if (/^over$/i.test(mm[2])) over = Number(price); else under = Number(price);
+        if (!price) continue;
+        const side = DAB_SIDE.exec(snm || "");
+        if (!side) continue;
+        const num = DAB_NUM.exec(snm || "") ?? mNum;
+        if (num) line = Number(num[1]);
+        if (/over/i.test(side[1])) over = Number(price); else under = Number(price);
       }
-      if (player == null || market == null || line == null) continue;
+      if (line == null) continue;
       // Over price → Compare odds ladder; both prices → the two-way Over/Unders feed.
       if (over) rows.push({
         book: "dabble", event: name, home, away,
