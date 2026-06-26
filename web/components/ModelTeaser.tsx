@@ -17,6 +17,12 @@ const LINKS: [string, string][] = [
 interface OddsRow { book: string; market: string; player: string; line: number; price: number }
 const MARKET_LABEL: Record<string, string> = Object.fromEntries(MARKETS);
 
+/** Short team tag from a club name, e.g. "West Coast" → "WC", "Carlton" → "CAR". */
+const teamTag = (team: string) => {
+  const words = team.trim().split(/\s+/);
+  return (words.length > 1 ? words.map((w) => w[0]).join("") : team.slice(0, 3)).toUpperCase();
+};
+
 /** Homepage teaser for the model section — leads with the live top value bets. */
 export default function ModelTeaser() {
   const [data, setData] = useState<ProjectionsOutput | null>(null);
@@ -62,15 +68,53 @@ export default function ModelTeaser() {
             🎯 The Model{data ? ` · Round ${data.round}` : ""}
           </div>
           <p className="mt-0.5 text-xs text-slate-400 sm:text-sm">
-            Player projections for 10 markets, a bookmaker odds comparison (Sportsbet · TAB ·
-            Ladbrokes · Dabble), Pick’em, and the value edges below with Kelly staking.
+            Every game predicted — win probability, projected margin and total — plus player
+            projections for 10 markets priced against Sportsbet · TAB · Ladbrokes · PointsBet · Dabble.
           </p>
         </div>
-        <Link href="/value"
+        <Link href="/projections"
           className="shrink-0 rounded-lg bg-grass px-3 py-2 font-display text-xs font-black uppercase tracking-wide text-pitch transition hover:bg-lime-300">
-          Find value →
+          All predictions →
         </Link>
       </div>
+
+      {/* this round — match predictions (win prob · margin · total) */}
+      {data && data.matches.length > 0 && (
+        <>
+          <div className="mt-4 text-[11px] uppercase tracking-wide text-slate-500">
+            🔮 Round {data.round} predictions
+          </div>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            {data.matches.map((m) => {
+              const homeFav = m.home_win_prob >= m.away_win_prob;
+              const favTeam = homeFav ? m.home_team : m.away_team;
+              const margin = Math.abs(m.exp_supremacy);
+              return (
+                <Link key={m.match_id} href="/projections"
+                  className="block rounded-lg border border-line bg-card px-3 py-2 transition hover:bg-card-hover">
+                  <div className="flex items-center gap-2 text-sm font-bold">
+                    <span className={`min-w-0 flex-1 truncate ${homeFav ? "text-grass" : "text-slate-300"}`}>{m.home_team}</span>
+                    <span className="shrink-0 text-[10px] font-normal text-slate-600">v</span>
+                    <span className={`min-w-0 flex-1 truncate text-right ${!homeFav ? "text-grass" : "text-slate-300"}`}>{m.away_team}</span>
+                  </div>
+                  {/* win-probability split bar */}
+                  <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-pitch">
+                    <span className="bg-grass" style={{ width: `${Math.round(m.home_win_prob * 100)}%` }} />
+                    <span className="bg-slate-600" style={{ width: `${Math.round(m.away_win_prob * 100)}%` }} />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{Math.round(m.home_win_prob * 100)}%</span>
+                    <span className="font-semibold text-slate-400">
+                      {teamTag(favTeam)} by {margin.toFixed(1)} · {Math.round(m.exp_total_points)} pts
+                    </span>
+                    <span>{Math.round(m.away_win_prob * 100)}%</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {value.length > 0 && (
         <>
