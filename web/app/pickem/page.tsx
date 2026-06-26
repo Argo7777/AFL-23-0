@@ -7,7 +7,7 @@ import {
   loadProjections, loadPickem, probOver, playerKey, PICKEM_MULTIPLIERS,
   type Market, type ProjectionsOutput, type PlayerProjection,
 } from "@/lib/modeldb";
-import { loadSuperCoach, scIndex, probScOver, type ScPlayer } from "@/lib/supercoach";
+import { loadSuperCoach, scIndex, probScOver, modelScFromStats, type ScPlayer, type ScModelFit } from "@/lib/supercoach";
 
 // Dabble Pick'em markets. SuperCoach is special — priced from the SuperCoach
 // projection (not the Monte-Carlo model, which doesn't score SC points).
@@ -25,6 +25,9 @@ export default function PickemPage() {
   const [proj, setProj] = useState<ProjectionsOutput | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [sc, setSc] = useState<Map<string, ScPlayer>>(new Map());
+  const [scFit, setScFit] = useState<ScModelFit | null>(null);
+  // For the SuperCoach market: price from SC's official projection or our stats-fitted model.
+  const [scSource, setScSource] = useState<"supercoach" | "model">("supercoach");
   const [market, setMarket] = useState<PkMarket>("disposals");
   const [matchFilter, setMatchFilter] = useState("all");
   const [lines, setLines] = useState<Record<string, number>>({}); // key -> overridden line
@@ -38,7 +41,7 @@ export default function PickemPage() {
 
   useEffect(() => {
     loadProjections().then(setProj).catch(() => setErr("Projections feed not built."));
-    loadSuperCoach().then((f) => setSc(scIndex(f)));
+    loadSuperCoach().then((f) => { setSc(scIndex(f)); setScFit(f?.model_fit ?? null); });
     loadPickem().then((pk) => {
       if (!pk?.lines?.length) { setMode("manual"); return; } // no Dabble lines yet → manual
       const full = new Map<string, number>();
@@ -74,7 +77,7 @@ export default function PickemPage() {
 
   const rows = useMemo(() => {
     if (!proj) return [];
-    const out: Array<{ key: string; p: PlayerProjection; match: string; proj: number; line: number; pOver: number; lean: "over" | "under"; conf: number; isPosted: boolean }> = [];
+    const out: Array<{ key: string; p: PlayerProjection; match: string; proj: number; line: number; pOver: number; lean: "over" | "under"; conf: number; isPosted: boolean; altProj?: number; altLabel?: string }> = [];
     for (const mt of proj.matches) {
       const match = `${mt.home_team} v ${mt.away_team}`;
       if (matchFilter !== "all" && match !== matchFilter) continue;
@@ -84,12 +87,26 @@ export default function PickemPage() {
         // market, otherwise from the Monte-Carlo distribution.
         let projection: number;
         let pOverFn: (line: number) => number;
+        let altProj: number | undefined;
+        let altLabel: string | undefined;
         if (market === "supercoach") {
           const scp = sc.get(playerKey(p.player));
           if (!scp) continue;
-          projection = scp.proj || scp.avg;
+          const official = scp.proj || scp.avg;
+          // our stats-fitted SC model, from the Monte-Carlo per-game projections
+          let modelSc = 0;
+          if (scFit) {
+            const stats: Record<string, number> = {};
+            for (const k of scFit.stats) stats[k] = p.dist?.[k as keyof typeof p.dist]?.mean ?? 0;
+            modelSc = modelScFromStats(scFit, stats);
+          }
+          const useModel = scSource === "model" && modelSc >= 5;
+          projection = useModel ? modelSc : official;
           if (projection < 1) continue;
-          pOverFn = (line) => probScOver(scp, line);
+          // surface whichever source isn't pricing, so the SC official is always visible
+          altProj = useModel ? official : (modelSc >= 5 ? modelSc : undefined);
+          altLabel = useModel ? "SC" : "model";
+          pOverFn = (line) => probScOver(scp, line, useModel ? modelSc : undefined);
         } else {
           const d = p.dist[market];
           if (!d || d.mean < 1) continue;
@@ -103,7 +120,7 @@ export default function PickemPage() {
         const line = lines[key] ?? postedLine ?? Math.max(0.5, Math.round(projection) - 0.5);
         const pOver = pOverFn(line);
         const lean = pOver >= 0.5 ? "over" : "under";
-        out.push({ key, p, match, proj: projection, line, pOver, lean, conf: Math.abs(pOver - 0.5), isPosted: postedLine != null });
+        out.push({ key, p, match, proj: projection, line, pOver, lean, conf: Math.abs(pOver - 0.5), isPosted: postedLine != null, altProj, altLabel });
       }
     }
     const val = (r: typeof out[number]): number | string =>
@@ -118,7 +135,7 @@ export default function PickemPage() {
     });
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proj, sc, market, matchFilter, lines, posted, keyCount, mode, havePosted, sort, q]);
+  }, [proj, sc, scFit, scSource, market, matchFilter, lines, posted, keyCount, mode, havePosted, sort, q]);
 
   const dabbleCount = useMemo(() => {
     if (!proj || !havePosted) return 0;
@@ -190,6 +207,28 @@ export default function PickemPage() {
         ))}
       </div>
 
+      {/* SuperCoach market: price the lines from SC's official projection or our model */}
+      {market === "supercoach" && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-slate-500">Price from</span>
+          <div className="inline-flex rounded-lg border border-line bg-card p-0.5">
+            <button onClick={() => setScSource("supercoach")}
+              className={"rounded-md px-3 py-1.5 font-bold transition " +
+                (scSource === "supercoach" ? "bg-gold text-pitch" : "text-slate-300")}>
+              SuperCoach official
+            </button>
+            <button onClick={() => setScSource("model")} disabled={!scFit}
+              className={"rounded-md px-3 py-1.5 font-bold transition " +
+                (scSource === "model" ? "bg-grass text-pitch" : "text-slate-300 disabled:text-slate-600")}>
+              {scFit ? "My model" : "My model (soon)"}
+            </button>
+          </div>
+          <span className="text-slate-500">
+            Proj shows the pricing source; the other is listed beneath it.
+          </span>
+        </div>
+      )}
+
       <div className="-mx-3 overflow-x-auto px-3 pb-28">
         <table className="w-full min-w-[32rem] border-separate border-spacing-0 text-sm">
           <thead className="text-xs uppercase text-slate-400">
@@ -222,7 +261,12 @@ export default function PickemPage() {
                     <div className="font-semibold leading-tight">{r.p.player}{r.isPosted && <span title="Dabble posted line" className="ml-1 text-gold">★</span>}</div>
                     <div className="text-[11px] leading-tight text-slate-500">{r.match}</div>
                   </td>
-                  <td className="border-t border-line/40 px-2 py-2 text-right text-slate-400">{r.proj.toFixed(1)}</td>
+                  <td className="border-t border-line/40 px-2 py-2 text-right text-slate-400">
+                    <div className="leading-tight">{r.proj.toFixed(1)}</div>
+                    {r.altProj != null && (
+                      <div className="text-[10px] leading-tight text-slate-500">{r.altLabel} {r.altProj.toFixed(0)}</div>
+                    )}
+                  </td>
                   <td className="border-t border-line/40 px-2 py-2 text-right">
                     <input inputMode="decimal" value={r.line}
                       onChange={(e) => setLines((p) => ({ ...p, [r.key]: Number(e.target.value) || r.line }))}

@@ -89,9 +89,12 @@ export function normalCdf(x: number, mean: number, sd: number): number {
  * P(SuperCoach score > line) for a player. SC doesn't publish a distribution, so
  * we model it as Normal(mean = projection, sd = the player's own game-to-game
  * std, falling back to ~28% of the mean — typical SC scoring spread).
+ *
+ * `meanOverride` swaps in a different projection (e.g. our stats-fitted model's
+ * SC score) while keeping the player's own scoring spread.
  */
-export function probScOver(p: ScPlayer, line: number): number {
-  const mean = p.proj || p.avg3 || p.avg;
+export function probScOver(p: ScPlayer, line: number, meanOverride?: number): number {
+  const mean = meanOverride ?? (p.proj || p.avg3 || p.avg);
   if (!mean) return 0;
   const sd = p.std > 3 ? p.std : Math.max(10, 0.28 * mean);
   return 1 - normalCdf(line, mean, sd);
