@@ -132,7 +132,7 @@ function PlayerTable({ m, market, q, sc }: { m: MatchProjection; market: Market;
   const rows = useMemo(
     () => m.players
       .filter((p) => !q || p.player.toLowerCase().includes(q.toLowerCase()))
-      .sort((a, b) => b.dist[market].mean - a.dist[market].mean),
+      .sort((a, b) => (b.dist[market]?.mean ?? 0) - (a.dist[market]?.mean ?? 0)),
     [m, market, q],
   );
   // two representative over-lines either side of the median
@@ -156,6 +156,7 @@ function PlayerTable({ m, market, q, sc }: { m: MatchProjection; market: Market;
         <tbody>
           {rows.map((p) => {
             const d = p.dist[market];
+            if (!d) return null; // stale cached feed without this market
             const line = lineFor(d.mean);
             const pov = d.over[line.toFixed(1)] ?? (line < d.mean ? 1 : 0);
             const scp = sc.get(playerKey(p.player));
@@ -171,7 +172,7 @@ function PlayerTable({ m, market, q, sc }: { m: MatchProjection; market: Market;
                 <td className="px-2 py-1.5 text-right font-bold">{d.mean.toFixed(1)}</td>
                 <td className="px-2 py-1.5 text-right text-slate-300">{d.p50}</td>
                 <td className="px-2 py-1.5 text-right text-slate-400">{d.p10}–{d.p90}</td>
-                <td className="px-2 py-1.5 text-right text-slate-500">{p.model_exp[market].toFixed(1)}</td>
+                <td className="px-2 py-1.5 text-right text-slate-500">{p.model_exp[market] != null ? p.model_exp[market].toFixed(1) : "—"}</td>
                 <td className="px-2 py-1.5 text-right text-slate-300">{line.toFixed(1)}</td>
                 <td className="px-2 py-1.5 text-right">
                   <span className={pov >= 0.5 ? "text-grass" : "text-slate-400"}>

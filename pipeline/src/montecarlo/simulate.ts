@@ -268,11 +268,18 @@ export function simulateMatch(
       const p = team.players[pi];
       const dist = {} as Record<Target, StatDist>;
       for (const t of TARGETS) dist[t] = statDist(hist[si][pi][t]);
+      // model_exp for the derived period markets = thinning fraction × full-game
+      // expectation (the Python model has no direct Q1/H1 target)
+      const model_exp = {
+        ...p.exp,
+        disposals_q1: round2((p.exp.disposals ?? 0) * F_Q1),
+        disposals_h1: round2((p.exp.disposals ?? 0) * F_H1),
+      };
       players.push({
         player_id: p.player_id, player: p.player, team: team.team,
         position: p.position, role: p.role, named_pos: p.named_pos ?? null,
         is_ruck: p.is_ruck,
-        is_home: si === 0 ? 1 : 0, tog: p.tog, model_exp: p.exp, dist,
+        is_home: si === 0 ? 1 : 0, tog: p.tog, model_exp, dist,
       });
     }
   }
