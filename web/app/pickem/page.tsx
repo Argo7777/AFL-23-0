@@ -13,7 +13,8 @@ import { loadSuperCoach, scIndex, probScOver, modelScFromStats, type ScPlayer, t
 // projection (not the Monte-Carlo model, which doesn't score SC points).
 type PkMarket = Market | "supercoach";
 const PICKEM_MARKETS: [PkMarket, string][] = [
-  ["disposals", "Disposals"], ["dreamTeamPoints", "Fantasy"], ["goals", "Goals"],
+  ["disposals", "Disposals"], ["disposals_q1", "Q1 Disposals"], ["disposals_h1", "1st Half Disposals"],
+  ["dreamTeamPoints", "Fantasy"], ["goals", "Goals"], ["kicks", "Kicks"], ["handballs", "Handballs"],
   ["marks", "Marks"], ["tackles", "Tackles"], ["supercoach", "SuperCoach"],
 ];
 // full-name key so two players sharing an initial+surname never collide
@@ -75,8 +76,22 @@ export default function PickemPage() {
     return null;
   };
 
+  const dabbleCount = useMemo(() => {
+    if (!proj || !havePosted) return 0;
+    let n = 0;
+    for (const mt of proj.matches)
+      for (const p of mt.players)
+        if (postedLineFor(p.player, market) != null) n++;
+    return n;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proj, posted, keyCount, market, havePosted]);
+
   const rows = useMemo(() => {
     if (!proj) return [];
+    // Dabble hasn't posted this market yet (e.g. Q1/H1 right after a round
+    // opens) → show every projected player at the model's line instead of an
+    // empty board
+    const gateOnPosted = mode === "dabble" && havePosted && dabbleCount > 0;
     const out: Array<{ key: string; p: PlayerProjection; match: string; proj: number; line: number; pOver: number; lean: "over" | "under"; conf: number; isPosted: boolean; altProj?: number; altLabel?: string }> = [];
     for (const mt of proj.matches) {
       const match = `${mt.home_team} v ${mt.away_team}`;
@@ -113,10 +128,11 @@ export default function PickemPage() {
           projection = d.mean;
           pOverFn = (line) => probOver(d, line);
         }
-        const key = `${playerKey(p.player)}|${market}`;
+        // player_id (not initial+surname) — two J. Berrys in one round must not collide
+        const key = `${p.player_id}|${market}`;
         const postedLine = postedLineFor(p.player, market);
         // Dabble mode: only the lines Dabble actually posted (auto-filled board)
-        if (mode === "dabble" && havePosted && postedLine == null && lines[key] == null) continue;
+        if (gateOnPosted && postedLine == null && lines[key] == null) continue;
         const line = lines[key] ?? postedLine ?? Math.max(0.5, Math.round(projection) - 0.5);
         const pOver = pOverFn(line);
         const lean = pOver >= 0.5 ? "over" : "under";
@@ -135,17 +151,7 @@ export default function PickemPage() {
     });
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proj, sc, scFit, scSource, market, matchFilter, lines, posted, keyCount, mode, havePosted, sort, q]);
-
-  const dabbleCount = useMemo(() => {
-    if (!proj || !havePosted) return 0;
-    let n = 0;
-    for (const mt of proj.matches)
-      for (const p of mt.players)
-        if (postedLineFor(p.player, market) != null) n++;
-    return n;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proj, posted, keyCount, market, havePosted]);
+  }, [proj, sc, scFit, scSource, market, matchFilter, lines, posted, keyCount, mode, havePosted, dabbleCount, sort, q]);
 
   const sortBy = (key: string) =>
     setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) as 1 | -1 : (key === "player" ? 1 : -1) }));
@@ -172,7 +178,9 @@ export default function PickemPage() {
         Pick’em is a fixed-multiplier parlay — pick {Object.keys(PICKEM_MULTIPLIERS)[0]}+ players over/under a
         line; the model rates each line and the slip below shows your combined model probability vs the payout.
         {mode === "dabble"
-          ? " Showing Dabble’s posted lines (★), auto-filled — edit any to match your screen."
+          ? (dabbleCount > 0
+            ? " Showing Dabble’s posted lines (★), auto-filled — edit any to match your screen."
+            : " Dabble hasn’t posted this market yet — showing every projected player at the model’s line until it lands.")
           : " Manual mode: every projected player at the model’s suggested line — edit any line."}
       </p>
 

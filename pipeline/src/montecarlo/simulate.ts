@@ -19,6 +19,8 @@ import {
   MatchProj, TeamProj, DispersionEntry, StatDist, PlayerProjection, MatchProjection,
 } from "./types.js";
 
+/** fallback team-total CVs; superseded by dispersion[stat].team_cv when the
+ *  Python artifact carries the empirically calibrated value */
 const TEAM_CV: Record<AllocStat, number> = {
   kicks: 0.09, handballs: 0.11, marks: 0.12, tackles: 0.13,
   totalClearances: 0.15, hitouts: 0.12, goals: 0.20, behinds: 0.20,
@@ -28,24 +30,43 @@ const FANTASY: Partial<Record<AllocStat, number>> = {
 };
 const HALF_LINES_CAP_SD = 3.2;
 const CAL_SIMS = 1200; // calibration batch size
-// Per-game "form" multiplier applied to a player's allocation weight. The
-// multinomial allocation already supplies ~the empirical game-to-game spread
-// (var ≈ N·share·(1−share) ≈ resid_std²), so this is only a small extra wobble —
-// using the full dispersion here double-counts variance and fattens the tails.
+// Baseline per-game "form" multiplier on a player's allocation weight. The
+// multinomial allocation supplies mean-scaled spread already; the variance
+// calibration pass then widens each player individually until the simulated
+// sd matches the Python model's per-player sigma target (when provided).
 const FORM_CV = 0.1;
+const MAX_JITTER_CV = 1.0;
+// Period thinning for Q1 / 1st-half disposal markets: each simulated disposal
+// lands in Q1 with p=F_Q1 and in the first half with p=F_H1 (nested draws, so
+// Q1 ⊆ H1 by construction). Fractions are the market-implied medians from
+// Dabble's own posted lines (Q1/full ≈ 0.244, H1/full ≈ 0.491) — i.e. play is
+// near-uniform across quarters with a slight first-quarter discount.
+const F_Q1 = 0.245;
+const F_H1 = 0.49;
 
 type Counts = Record<AllocStat, number[]>;
+
+/** per-side calibration state: mean corrections + per-player jitter CVs */
+interface Calib {
+  corr: Record<AllocStat, number[]>;
+  jcv: Record<AllocStat, number[]>;
+}
+
+function teamCv(stat: AllocStat, dispersion: Record<Target, DispersionEntry>): number {
+  const cv = dispersion[stat]?.team_cv;
+  return cv && cv > 0 ? cv : TEAM_CV[stat];
+}
 
 /** one simulated team-game: per-player allocated counts + team goals/behinds */
 function simSide(
   team: TeamProj, dispersion: Record<Target, DispersionEntry>,
-  rng: Rng, corr: Record<AllocStat, number[]>,
+  rng: Rng, cal: Calib,
 ): { counts: Counts; goals: number; behinds: number } {
   const counts = {} as Counts;
   for (const stat of ALLOC_STATS) {
-    const N = rng.countDraw(team.team_total[stat] || 0, TEAM_CV[stat]);
+    const N = rng.countDraw(team.team_total[stat] || 0, teamCv(stat, dispersion));
     const weights = team.players.map(
-      (p, i) => Math.max(0, p.share[stat]) * corr[stat][i] * rng.jitter(FORM_CV),
+      (p, i) => Math.max(0, p.share[stat]) * cal.corr[stat][i] * rng.jitter(cal.jcv[stat][i]),
     );
     counts[stat] = allocate(N, weights, rng);
   }
@@ -54,40 +75,106 @@ function simSide(
   return { counts, goals, behinds };
 }
 
-/** unit corrections (no-op) */
-function unitCorr(team: TeamProj): Record<AllocStat, number[]> {
-  const c = {} as Record<AllocStat, number[]>;
-  for (const s of ALLOC_STATS) c[s] = team.players.map(() => 1);
-  return c;
+/** unit calibration (no-op corrections, baseline jitter) */
+function unitCalib(team: TeamProj): Calib {
+  const corr = {} as Record<AllocStat, number[]>;
+  const jcv = {} as Record<AllocStat, number[]>;
+  for (const s of ALLOC_STATS) {
+    corr[s] = team.players.map(() => 1);
+    jcv[s] = team.players.map(() => FORM_CV);
+  }
+  return { corr, jcv };
 }
 
-/** estimate corrections so each player's simulated mean ≈ model expectation */
+/** Two-pass calibration.
+ *  Pass 1: correct each player's allocation weight so simulated mean ≈ model
+ *  expectation. Pass 2: measure the simulated per-player sd under those
+ *  corrections and, where the Python artifact supplies a per-player sigma
+ *  target, widen that player's form jitter until sim sd ≈ sigma. (Jitter is
+ *  mean-one lognormal, so pass-2 widening leaves pass-1 means intact. If the
+ *  natural sim spread already exceeds the target we can't shrink — keep base.) */
 function calibrate(
   team: TeamProj, dispersion: Record<Target, DispersionEntry>, rng: Rng,
-): Record<AllocStat, number[]> {
+): Calib {
+  const cal = unitCalib(team);
+  const nP = team.players.length;
+
+  // pass 1: means
   const sums = {} as Record<AllocStat, number[]>;
   for (const s of ALLOC_STATS) sums[s] = team.players.map(() => 0);
-  const corr = unitCorr(team);
   for (let i = 0; i < CAL_SIMS; i++) {
-    const { counts } = simSide(team, dispersion, rng, corr);
+    const { counts } = simSide(team, dispersion, rng, cal);
     for (const s of ALLOC_STATS)
-      for (let p = 0; p < team.players.length; p++) sums[s][p] += counts[s][p];
+      for (let p = 0; p < nP; p++) sums[s][p] += counts[s][p];
   }
   for (const s of ALLOC_STATS) {
-    for (let p = 0; p < team.players.length; p++) {
+    for (let p = 0; p < nP; p++) {
       const simMean = sums[s][p] / CAL_SIMS;
       const want = team.players[p].exp[s] ?? 0;
-      corr[s][p] = simMean > 1e-6 ? clamp(want / simMean, 0.4, 2.5) : 1;
+      cal.corr[s][p] = simMean > 1e-6 ? clamp(want / simMean, 0.4, 2.5) : 1;
     }
   }
-  return corr;
+
+  // pass 2: variance, under the corrected means
+  const s1 = {} as Record<AllocStat, number[]>;
+  const s2 = {} as Record<AllocStat, number[]>;
+  for (const s of ALLOC_STATS) {
+    s1[s] = team.players.map(() => 0);
+    s2[s] = team.players.map(() => 0);
+  }
+  for (let i = 0; i < CAL_SIMS; i++) {
+    const { counts } = simSide(team, dispersion, rng, cal);
+    for (const s of ALLOC_STATS)
+      for (let p = 0; p < nP; p++) {
+        s1[s][p] += counts[s][p];
+        s2[s][p] += counts[s][p] * counts[s][p];
+      }
+  }
+  for (const s of ALLOC_STATS) {
+    const teamMean = team.team_total[s] || 0;
+    for (let p = 0; p < nP; p++) {
+      const tgt = team.players[p].sigma?.[s];
+      if (!tgt || tgt <= 0) continue;
+      const m = s1[s][p] / CAL_SIMS;
+      if (m < 0.3) continue; // near-zero expectations: leave the natural spread
+      // sensitivity of an allocated count to this player's weight jitter is
+      // damped by (1 − share): for near-monopoly shares (a ruck's hitouts)
+      // weight jitter can't move the count — the team-total CV carries it
+      const share = teamMean > 0 ? m / teamMean : 0;
+      if (share > 0.7) continue;
+      const simVar = Math.max(0, s2[s][p] / CAL_SIMS - m * m);
+      const gap = tgt * tgt - simVar;
+      if (gap <= 0) continue; // already at/above target width
+      const extra = Math.sqrt(gap) / (m * (1 - share));
+      cal.jcv[s][p] = Math.min(Math.hypot(FORM_CV, extra), MAX_JITTER_CV);
+    }
+  }
+
+  // pass 3: re-correct means under the final jitter — wide lognormal jitter on
+  // a large share biases the allocated mean (Jensen), so recalibrate against it
+  const s3 = {} as Record<AllocStat, number[]>;
+  for (const s of ALLOC_STATS) s3[s] = team.players.map(() => 0);
+  for (let i = 0; i < CAL_SIMS; i++) {
+    const { counts } = simSide(team, dispersion, rng, cal);
+    for (const s of ALLOC_STATS)
+      for (let p = 0; p < nP; p++) s3[s][p] += counts[s][p];
+  }
+  for (const s of ALLOC_STATS) {
+    for (let p = 0; p < nP; p++) {
+      const simMean = s3[s][p] / CAL_SIMS;
+      const want = team.players[p].exp[s] ?? 0;
+      if (simMean > 1e-6) cal.corr[s][p] = clamp(cal.corr[s][p] * (want / simMean), 0.3, 4);
+    }
+  }
+  return cal;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
 function sizeFor(t: Target): number {
-  return t === "dreamTeamPoints" ? 320 : t === "disposals" ? 90 : 80;
+  return t === "dreamTeamPoints" ? 320 : t === "disposals" ? 90
+    : t === "disposals_q1" || t === "disposals_h1" ? 60 : 80;
 }
 
 function statDist(hist: Int32Array): StatDist {
@@ -126,7 +213,7 @@ export function simulateMatch(
   const sides = [match.home, match.away];
 
   // calibrate each side on its own RNG stream (reproducible)
-  const corr = sides.map((s, i) => calibrate(s, dispersion, new Rng(seed + 101 * (i + 1))));
+  const cal = sides.map((s, i) => calibrate(s, dispersion, new Rng(seed + 101 * (i + 1))));
 
   const rng = new Rng(seed);
   const hist = sides.map((s) =>
@@ -144,15 +231,23 @@ export function simulateMatch(
     const teamPts = [0, 0];
     for (let si = 0; si < 2; si++) {
       const team = sides[si];
-      const { counts, goals: tg, behinds: tb } = simSide(team, dispersion, rng, corr[si]);
+      const { counts, goals: tg, behinds: tb } = simSide(team, dispersion, rng, cal[si]);
       for (let pi = 0; pi < team.players.length; pi++) {
         const k = counts.kicks[pi], hb = counts.handballs[pi];
         const disposals = k + hb;
+        // thin the game's disposals into Q1 / 1st half (nested: Q1 ⊆ H1)
+        let q1 = 0, h1 = 0;
+        for (let e = 0; e < disposals; e++) {
+          const r = rng.next();
+          if (r < F_Q1) { q1++; h1++; }
+          else if (r < F_H1) h1++;
+        }
         let fantasy = 0;
         for (const stat of ALLOC_STATS) fantasy += (FANTASY[stat] ?? 0) * counts[stat][pi];
         const h = hist[si][pi];
         const put = (t: Target, v: number) => h[t][Math.min(v, h[t].length - 1)]++;
         put("kicks", k); put("handballs", hb); put("disposals", disposals);
+        put("disposals_q1", q1); put("disposals_h1", h1);
         put("marks", counts.marks[pi]); put("tackles", counts.tackles[pi]);
         put("totalClearances", counts.totalClearances[pi]); put("hitouts", counts.hitouts[pi]);
         put("goals", counts.goals[pi]); put("behinds", counts.behinds[pi]);
@@ -175,7 +270,8 @@ export function simulateMatch(
       for (const t of TARGETS) dist[t] = statDist(hist[si][pi][t]);
       players.push({
         player_id: p.player_id, player: p.player, team: team.team,
-        position: p.position, role: p.role, is_ruck: p.is_ruck,
+        position: p.position, role: p.role, named_pos: p.named_pos ?? null,
+        is_ruck: p.is_ruck,
         is_home: si === 0 ? 1 : 0, tog: p.tog, model_exp: p.exp, dist,
       });
     }
@@ -190,6 +286,7 @@ export function simulateMatch(
   return {
     match_id: match.match_id, venue: match.venue, date: match.date,
     home_team: match.home.team, away_team: match.away.team,
+    home_lineup: match.home.lineup ?? "proxy", away_lineup: match.away.lineup ?? "proxy",
     home_win_prob: round2(homeWins / nSims), away_win_prob: round2(awayWins / nSims),
     draw_prob: round2(draws / nSims),
     exp_total_points: match.exp_total_points, exp_supremacy: match.exp_supremacy,

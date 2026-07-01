@@ -54,7 +54,9 @@ export interface PickemLine { player: string; event: string; market: string; lin
 // Dabble resultingType suffix (odds_on_pickem_<suffix>) → our model market key
 const PICKEM_RT: Record<string, string> = {
   disposals: "disposals", goals: "goals", marks: "marks", tackles: "tackles",
+  kicks: "kicks", handballs: "handballs",
   fantasy: "dreamTeamPoints", supercoach: "supercoach",
+  first_qtr_disposals: "disposals_q1", first_half_disposals: "disposals_h1",
 };
 const pickemLines: PickemLine[] = [];
 
@@ -236,15 +238,16 @@ async function fetchDabble(): Promise<OddsRow[]> {
       if (!best[k] || r.price > best[k].price) best[k] = r;
     }
     rows.push(...Object.values(best));
-    // Pick'em product: ONLY the main full-game line per player+stat. Dabble bundles
-    // alt-line ("sportcast_to_get_30_plus_disposals") and period ("first_qtr"/
-    // "first_half") props into playerProps too — those produced bogus lines like
-    // Neale 39.5 disposals. The genuine pick'em line is resultingType
-    // "odds_on_pickem_<stat>" exactly (full game), so gate on that.
+    // Pick'em product: ONLY the main line per player+stat. Dabble bundles
+    // alt-line ("sportcast_to_get_30_plus_disposals") and non-pickem period
+    // ladders into playerProps too — those produced bogus lines like Neale
+    // 39.5 disposals. The genuine pick'em lines are resultingType
+    // "odds_on_pickem_<stat>" exactly — full-game stats plus the 1st-quarter /
+    // 1st-half disposal markets — so gate on that.
     const seen = new Set<string>();
     for (const pp of sfd.playerProps ?? []) {
       const rt = rtById[pp.marketId] || "";
-      const mm = /^odds_on_pickem_(disposals|goals|marks|tackles|fantasy|supercoach)$/.exec(rt);
+      const mm = /^odds_on_pickem_(first_qtr_disposals|first_half_disposals|disposals|goals|kicks|handballs|marks|tackles|fantasy|supercoach)$/.exec(rt);
       if (!mm || pp.value == null || !pp.playerName) continue;
       const stat = PICKEM_RT[mm[1]];
       const key = `${pp.playerName}|${stat}`;          // one main line per player+stat

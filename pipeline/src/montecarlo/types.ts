@@ -4,6 +4,9 @@
 export const TARGETS = [
   "disposals", "goals", "kicks", "handballs", "marks", "tackles",
   "behinds", "totalClearances", "hitouts", "dreamTeamPoints",
+  // period splits, derived per-sim by thinning full-game disposals (Q1 ⊂ H1);
+  // they have no exp/share in the projection inputs
+  "disposals_q1", "disposals_h1",
 ] as const;
 export type Target = (typeof TARGETS)[number];
 
@@ -20,15 +23,22 @@ export interface PlayerProj {
   player: string;
   position: string;
   role: string;
+  /** field position in the CONFIRMED team (e.g. "RK", "C"), when named */
+  named_pos?: string | null;
   is_ruck: number;
   tog: number;
   exp: Record<Target, number>;
   share: Record<Target, number>;
+  /** per-player predictive sigma from the Python sigma model (optional —
+   *  older artifacts don't carry it; sims then keep their natural spread) */
+  sigma?: Partial<Record<Target, number>>;
 }
 
 export interface TeamProj {
   team_id: string;
   team: string;
+  /** "confirmed" / "provisional" (named team) or "proxy" (most recent XVIII) */
+  lineup?: string;
   team_total: Record<Target, number>;
   exp_points: number;
   players: PlayerProj[];
@@ -49,6 +59,15 @@ export interface DispersionEntry {
   resid_std: number;
   disp_pct: number;
   mean: number;
+  /** heteroscedastic sigma model: sigma(pred) = sigma_a + sigma_b·sqrt(pred) */
+  sigma_a?: number;
+  sigma_b?: number;
+  sigma_floor?: number;
+  /** Poisson overdispersion Var/mean */
+  phi?: number;
+  /** empirical CV of (actual − expected)/expected TEAM totals on the holdout —
+   *  the spread team totals should be drawn with (replaces hardcoded guesses) */
+  team_cv?: number;
 }
 
 export interface ProjectionInputs {
@@ -78,6 +97,7 @@ export interface PlayerProjection {
   team: string;
   position: string;
   role: string;
+  named_pos?: string | null;
   is_ruck: number;
   is_home: number;
   tog: number;
@@ -93,6 +113,9 @@ export interface MatchProjection {
   date: string | null;
   home_team: string;
   away_team: string;
+  /** lineup source per side: "confirmed" (named 23) or "proxy" */
+  home_lineup?: string;
+  away_lineup?: string;
   home_win_prob: number;
   away_win_prob: number;
   draw_prob: number;

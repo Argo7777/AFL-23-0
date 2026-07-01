@@ -13,7 +13,9 @@ export const MARKETS = [
   ["totalClearances", "Clearances"],
   ["hitouts", "Hit Outs"],
 ] as const;
-export type Market = (typeof MARKETS)[number][0];
+// dist also carries the derived period splits (Q1 ⊂ 1st half disposals),
+// which aren't Compare-page MARKETS but are priced on the Pick'em page
+export type Market = (typeof MARKETS)[number][0] | "disposals_q1" | "disposals_h1";
 
 export interface StatDist {
   mean: number; sd: number;

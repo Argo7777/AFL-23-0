@@ -43,7 +43,7 @@ function team(name: string, scale: number): TeamProj {
 }
 
 const disp: Record<Target, DispersionEntry> = Object.fromEntries(
-  (["disposals", ...ALLOC_STATS] as Target[]).map((t) => [t, { type: "normal", resid_std: 1, disp_pct: 0.3, mean: 1 }]),
+  (["disposals", ...ALLOC_STATS] as Target[]).map((t) => [t, { type: "normal", resid_std: 1, disp_pct: 0.3, mean: 1, team_cv: 0.12 }]),
 ) as Record<Target, DispersionEntry>;
 
 const match: MatchProj = {
@@ -51,6 +51,9 @@ const match: MatchProj = {
   home: team("Home", 1.0), away: team("Away", 0.85),
   exp_total_points: 0, exp_supremacy: 0,
 };
+// variance calibration target: the home mid's kicks should widen to sd≈6
+// (natural multinomial spread is ~3.5) while its mean stays calibrated
+match.home.players[0].sigma = { kicks: 6 };
 match.exp_total_points = match.home.exp_points + match.away.exp_points;
 match.exp_supremacy = match.home.exp_points - match.away.exp_points;
 
@@ -84,6 +87,23 @@ for (const p of res.players)
     if (v < 0 || v > 1) probOk = false;
   }
 ok(probOk, "all over-probabilities in [0,1]");
+
+// 3b. variance calibration: home mid's kicks sd pulled toward the sigma target
+const mid = res.players.find((p) => p.player_id === "Home1")!;
+ok(Math.abs(mid.dist.kicks.sd - 6) / 6 < 0.2,
+  `variance calibration: Home Mid kicks sd ${mid.dist.kicks.sd.toFixed(2)} ≈ target 6`);
+ok(Math.abs(mid.dist.kicks.mean - mid.model_exp.kicks) / mid.model_exp.kicks < 0.08,
+  `variance calibration preserves mean (${mid.dist.kicks.mean.toFixed(2)} vs ${mid.model_exp.kicks})`);
+
+// 3c. period thinning: Q1 ≈ 24.5% and 1st half ≈ 49% of full-game disposals
+let thinOk = true;
+for (const p of res.players) {
+  const d = p.dist.disposals.mean;
+  if (d < 5) continue;
+  const rq = p.dist.disposals_q1.mean / d, rh = p.dist.disposals_h1.mean / d;
+  if (Math.abs(rq - 0.245) > 0.02 || Math.abs(rh - 0.49) > 0.03) thinOk = false;
+}
+ok(thinOk, "period thinning: Q1 ≈ 0.245 and H1 ≈ 0.49 of full-game disposals");
 
 // 4. match result probabilities sum to ~1, favourite is home (stronger team)
 const sum = res.home_win_prob + res.away_win_prob + res.draw_prob;
