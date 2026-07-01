@@ -3,6 +3,8 @@ import { BASE_PATH } from "@/lib/game/data";
 
 export const MARKETS = [
   ["disposals", "Disposals"],
+  ["disposals_q1", "Q1 Disposals"],
+  ["disposals_h1", "1st Half Disposals"],
   ["dreamTeamPoints", "Fantasy"],
   ["goals", "Goals"],
   ["kicks", "Kicks"],
@@ -13,9 +15,7 @@ export const MARKETS = [
   ["totalClearances", "Clearances"],
   ["hitouts", "Hit Outs"],
 ] as const;
-// dist also carries the derived period splits (Q1 ⊂ 1st half disposals),
-// which aren't Compare-page MARKETS but are priced on the Pick'em page
-export type Market = (typeof MARKETS)[number][0] | "disposals_q1" | "disposals_h1";
+export type Market = (typeof MARKETS)[number][0];
 
 export interface StatDist {
   mean: number; sd: number;

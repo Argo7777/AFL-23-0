@@ -153,6 +153,8 @@ const DAB_MKT_OU = new RegExp(`^(.+?) Over/Under (${STAT_ALT})$`, "i");      // 
 const DAB_SIDE = /\b(Over|Under)\b/i;                                        // O/U selection: side
 const DAB_NUM = /([\d.]+)/;                                                  // line
 const DAB_THRESH = new RegExp(`^To (?:Have|Get|Score|Kick) (\\d+)\\+ (${STAT_ALT})$`, "i"); // single ladder
+// period disposal ladders: "To Have 8+ Disposals - 1st Half" / "- 1st Quarter"
+const DAB_PERIOD = /^To (?:Have|Get) (\d+)\+ Disposals\s*[-–]\s*1st (Quarter|Half)$/i;
 const DAB_ANYTIME = /^Anytime Goal\s?scorer$/i;
 
 async function fetchDabble(): Promise<OddsRow[]> {
@@ -215,6 +217,19 @@ async function fetchDabble(): Promise<OddsRow[]> {
         const market = STAT_MAP[th[2]] ?? STAT_MAP[th[2].replace(/\b\w/g, (c) => c.toUpperCase())];
         if (!market) continue;
         const line = Number(th[1]) - 0.5;
+        for (const [snm, price] of outs) {
+          if (!price || !snm || snm.includes("&")) continue;
+          dab.push({ book: "dabble", event: name, home, away, start_iso: start, market, player: snm.trim(), line, price: Number(price) });
+        }
+        continue;
+      }
+
+      // 2b) period disposal ladders → disposals_q1 / disposals_h1 (priced fixed
+      // odds against the model's thinned Q1/H1 distributions)
+      const pd = DAB_PERIOD.exec(mname);
+      if (pd) {
+        const market = pd[2].toLowerCase() === "quarter" ? "disposals_q1" : "disposals_h1";
+        const line = Number(pd[1]) - 0.5;
         for (const [snm, price] of outs) {
           if (!price || !snm || snm.includes("&")) continue;
           dab.push({ book: "dabble", event: name, home, away, start_iso: start, market, player: snm.trim(), line, price: Number(price) });
