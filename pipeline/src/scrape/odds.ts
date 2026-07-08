@@ -152,7 +152,8 @@ const DAB_OU_TYPE = /_over_under$/i;
 const DAB_MKT_OU = new RegExp(`^(.+?) Over/Under (${STAT_ALT})$`, "i");      // O/U market: player + stat
 const DAB_SIDE = /\b(Over|Under)\b/i;                                        // O/U selection: side
 const DAB_NUM = /([\d.]+)/;                                                  // line
-const DAB_THRESH = new RegExp(`^To (?:Have|Get|Score|Kick) (\\d+)\\+ (${STAT_ALT})$`, "i"); // single ladder
+// verb varies by stat: "To Have 20+ Disposals", "To Kick 3+ Goals", "To Take 5+ Marks".
+const DAB_THRESH = new RegExp(`^To (?:Have|Get|Take|Score|Kick) (\\d+)\\+ (${STAT_ALT})$`, "i"); // single ladder
 // period disposal ladders: "To Have 8+ Disposals - 1st Half" / "- 1st Quarter"
 const DAB_PERIOD = /^To (?:Have|Get) (\d+)\+ Disposals\s*[-–]\s*1st (Quarter|Half)$/i;
 const DAB_ANYTIME = /^Anytime Goal\s?scorer$/i;
